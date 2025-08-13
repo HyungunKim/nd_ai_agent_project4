@@ -16,7 +16,7 @@ from smolagents import (
     tool,
 )
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(funcName) - %(message)s', filename='project_output.log', filemode='w')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(funcName)s - %(message)s', filename='project_output.log', filemode='w')
 
 # Create an SQLite database
 logging.info('Logging started')
@@ -379,7 +379,7 @@ def get_stock_level(item_name: str, as_of_date: Union[str, datetime]) -> pd.Data
         db_engine,
         params={"item_name": item_name, "as_of_date": as_of_date},
     )
-
+@tool
 def get_supplier_delivery_date(input_date_str: str, quantity: int) -> str:
     """
     Estimate the supplier delivery date based on the requested order quantity and a starting date.
@@ -424,6 +424,7 @@ def get_supplier_delivery_date(input_date_str: str, quantity: int) -> str:
     # Return formatted delivery date
     return delivery_date_dt.strftime("%Y-%m-%d")
 
+@tool
 def get_cash_balance(as_of_date: Union[str, datetime]) -> float:
     """
     Calculate the current cash balance as of a specified date.
@@ -461,7 +462,7 @@ def get_cash_balance(as_of_date: Union[str, datetime]) -> float:
         print(f"Error getting cash balance: {e}")
         return 0.0
 
-
+@tool
 def generate_financial_report(as_of_date: Union[str, datetime]) -> Dict:
     """
     Generate a complete financial report for the company as of a specific date.
@@ -532,7 +533,7 @@ def generate_financial_report(as_of_date: Union[str, datetime]) -> Dict:
         "top_selling_products": top_selling_products,
     }
 
-
+@tool
 def search_quote_history(search_terms: List[str], limit: int = 5) -> List[Dict]:
     """
     Retrieve a list of historical quotes that match any of the provided search terms.
@@ -610,7 +611,7 @@ import dotenv
 dotenv.load_dotenv()
 openai_api_key = os.getenv("UDACITY_OPENAI_API_KEY")
 model = OpenAIServerModel(
-    model_id="gpt-4o-mini",
+    model_id="gpt-4o-nano",
     api_base="https://openai.vocareum.com/v1",
     api_key=openai_api_key,
 )
@@ -1262,37 +1263,33 @@ class FinancialAgent(ToolCallingAgent):
 # Initialize the agents
 inventory_agent = ToolCallingAgent(model=model,
                          tools=[check_inventory_status, get_inventory_report],
-                         instructions="""
-                         You are a ...
-                         """,
+                         name="InventoryAgent",
                          description="""
-                         The agent for handling inventory logic. It has access to tools such as
+                         The agent for handling inventory logic. It has access to tools such as check_inventory_status and get_inventory_report.
                          """)
 
 quote_agent = ToolCallingAgent(model=model,
                          tools=[generate_quote,
                                 calculate_bulk_discount,
                                 search_quote_history],
-                         instructions="""
-                         """,
+                         name="QuoteAgent",
                          description="""
+                         The agent for generating quotes. It has access to tools such as `generate_quote`, `calculate_bulk_discount`, `search_quote_history`.
                          """)
 order_agent = ToolCallingAgent(model=model,
                          tools=[process_order, check_order_status, get_supplier_delivery_date],
-                         instructions="""
-                         """,
+                         name="OrderAgent",
                          description="""
+                         The agent for processing orders. It has access to tools such as `process_order`, `check_order_status`, `get_supplier_delivery_date`.
                          """)
 financial_agent = ToolCallingAgent(model=model,
                          tools=[get_financial_status, get_cash_balance, generate_financial_report],
-                         instructions="""
-                         """,
+                         name="FinancialAgent",
                          description="""
+                         The agent for generating financial reports. It has access to tools such as `get_financial_status`, `get_cash_balance`, `generate_financial_report`.
                          """)
-orchestrator = CodeAgent(model,
+orchestrator = CodeAgent(model=model,
                          tools=[parse_request],
-                         instructions="""
-                         """,
                          managed_agents=[inventory_agent, quote_agent, order_agent, financial_agent])
 
 
@@ -1349,7 +1346,7 @@ def run_test_scenarios():
         request_with_date = f"{row['request']} (Date of request: {request_date})"
 
         # Use our orchestrator agent to handle the request
-        response = orchestrator.handle_request(request_with_date)
+        response = orchestrator.run(request_with_date)
 
         # Update state
         report = generate_financial_report(request_date)
