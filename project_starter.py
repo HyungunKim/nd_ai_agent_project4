@@ -9,6 +9,11 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Union
 from sqlalchemy import create_engine, Engine
 import logging
+from smolagents import (
+    ToolCallingAgent,
+    OpenAIServerModel,
+    tool,
+)
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(funcName) - %(message)s', filename='project_output.log', filemode='w')
 
@@ -17,7 +22,8 @@ logging.info('Logging started')
 logging.info('Creating database connection')
 db_engine = create_engine("sqlite:///munder_difflin.db")
 
-# List containing the different kinds of papers 
+# List containing the different kinds of papers
+DEFUALT_MARKUP = 2.0
 paper_supplies = [
     # Paper Types (priced per sheet unless specified)
     {"item_name": "A4 paper",                         "category": "paper",        "unit_price": 0.05},
@@ -131,7 +137,7 @@ def generate_sample_inventory(paper_supplies: list, coverage: float = 0.4, seed:
     # Return inventory as a pandas DataFrame
     return pd.DataFrame(inventory)
 
-def init_database(db_engine: Engine, seed: int = 137) -> Engine:    
+def init_database(db_engine: Engine = db_engine, seed: int = 137) -> Engine:    
     """
     Set up the Munder Difflin database with all required tables and initial records.
 
@@ -228,7 +234,7 @@ def init_database(db_engine: Engine, seed: int = 137) -> Engine:
                 "item_name": item["item_name"],
                 "transaction_type": "stock_orders",
                 "units": item["current_stock"],
-                "price": item["current_stock"] * item["unit_price"],
+                "price": item["current_stock"] * item["unit_price"] / DEFUALT_MARKUP,
                 "transaction_date": initial_date,
             })
 
@@ -596,27 +602,888 @@ def search_quote_history(search_terms: List[str], limit: int = 5) -> List[Dict]:
 
 # Set up and load your env parameters and instantiate your model.
 
-
 """Set up tools for your agents to use, these should be methods that combine the database functions above
  and apply criteria to them to ensure that the flow of the system is correct."""
 
+import dotenv
+dotenv.load_dotenv()
+openai_api_key = os.getenv("UDACITY_OPENAI_API_KEY")
+model = OpenAIServerModel(
+    model_id="gpt-4o-mini",
+    api_base="https://openai.vocareum.com/v1",
+    api_key=openai_api_key,
+)
 
 # Tools for inventory agent
 
+def check_inventory_status(item_name: str, quantity: int, as_of_date: str) -> Dict:
+    """
+    Check if the requested item is available in sufficient quantity and provide inventory status.
+
+    Args:
+        item_name (str): The name of the item to check
+        quantity (int): The requested quantity
+        as_of_date (str): The date to check inventory as of
+
+    Returns:
+        Dict: A dictionary containing inventory status information
+    """
+    # Get current stock level
+    stock_info = get_stock_level(item_name, as_of_date)
+
+    if stock_info.empty:
+        return {
+            "item_name": item_name,
+            "available": False,
+            "requested_quantity": quantity,
+            "current_stock": 0,
+            "status": "Item not found in inventory",
+            "needs_restock": True,
+            "restock_quantity": quantity
+        }
+
+    current_stock = stock_info["current_stock"].iloc[0]
+
+    # Check if we have enough stock
+    available = current_stock >= quantity
+
+    # Get minimum stock level from inventory table
+    inventory_query = f"SELECT min_stock_level FROM inventory WHERE item_name = '{item_name}'"
+    min_stock_result = pd.read_sql(inventory_query, db_engine)
+
+    if min_stock_result.empty:
+        min_stock_level = 100  # Default minimum stock level
+    else:
+        min_stock_level = min_stock_result["min_stock_level"].iloc[0]
+
+    # Determine if restocking is needed
+    remaining_stock = current_stock - quantity if available else current_stock
+    needs_restock = remaining_stock < min_stock_level
+
+    # Calculate restock quantity (to bring stock back to min_stock_level + buffer)
+    buffer = 100  # Additional buffer stock
+    restock_quantity = 0
+    if needs_restock:
+        restock_quantity = (min_stock_level + buffer) - remaining_stock
+
+    return {
+        "item_name": item_name,
+        "available": available,
+        "requested_quantity": quantity,
+        "current_stock": current_stock,
+        "min_stock_level": min_stock_level,
+        "status": "Available" if available else "Insufficient stock",
+        "needs_restock": needs_restock,
+        "restock_quantity": restock_quantity if needs_restock else 0
+    }
+
+def get_inventory_report(as_of_date: str) -> Dict:
+    """
+    Generate a comprehensive inventory report as of a specific date.
+
+    Args:
+        as_of_date (str): The date to generate the report for
+
+    Returns:
+        Dict: A dictionary containing inventory report information
+    """
+    # Get all inventory items
+    inventory_df = pd.read_sql("SELECT * FROM inventory", db_engine)
+
+    # Get current stock levels for all items
+    current_inventory = get_all_inventory(as_of_date)
+
+    # Prepare report data
+    items_below_threshold = []
+    items_in_stock = []
+    items_out_of_stock = []
+
+    for _, item in inventory_df.iterrows():
+        item_name = item["item_name"]
+        min_stock_level = item["min_stock_level"]
+
+        # Get current stock level
+        current_stock = current_inventory.get(item_name, 0)
+
+        item_info = {
+            "item_name": item_name,
+            "category": item["category"],
+            "unit_price": item["unit_price"],
+            "current_stock": current_stock,
+            "min_stock_level": min_stock_level
+        }
+
+        # Categorize items
+        if current_stock == 0:
+            items_out_of_stock.append(item_info)
+        elif current_stock < min_stock_level:
+            items_below_threshold.append(item_info)
+        else:
+            items_in_stock.append(item_info)
+
+    return {
+        "as_of_date": as_of_date,
+        "total_items": len(inventory_df),
+        "items_in_stock": len(items_in_stock),
+        "items_below_threshold": len(items_below_threshold),
+        "items_out_of_stock": len(items_out_of_stock),
+        "detailed_below_threshold": items_below_threshold,
+        "detailed_out_of_stock": items_out_of_stock
+    }
+
 
 # Tools for quoting agent
+def calculate_bulk_discount(item_name: str, quantity: int) -> Dict:
+    """
+    Calculate the appropriate bulk discount for an item based on quantity.
+
+    Args:
+        item_name (str): The name of the item
+        quantity (int): The quantity ordered
+
+    Returns:
+        Dict: A dictionary containing discount information
+    """
+    # Get the base unit price for the item
+    inventory_query = f"SELECT unit_price FROM inventory WHERE item_name = '{item_name}'"
+    price_result = pd.read_sql(inventory_query, db_engine)
+
+    if price_result.empty:
+        # Try to find in paper_supplies if not in inventory
+        for item in paper_supplies:
+            if item["item_name"] == item_name:
+                unit_price = item["unit_price"]
+                break
+        else:
+            return {
+                "item_name": item_name,
+                "quantity": quantity,
+                "unit_price": 0,
+                "discount_percentage": 0,
+                "discounted_unit_price": 0,
+                "total_price": 0,
+                "error": "Item not found"
+            }
+    else:
+        unit_price = price_result["unit_price"].iloc[0]
+
+    # Calculate discount percentage based on quantity
+    if quantity < 100:
+        discount_percentage = 0
+    elif quantity < 500:
+        discount_percentage = 5
+    elif quantity < 1000:
+        discount_percentage = 10
+    else:
+        discount_percentage = 15
+
+    # Apply discount
+    discounted_unit_price = unit_price * (1 - discount_percentage / 100)
+    total_price = discounted_unit_price * quantity
+
+    return {
+        "item_name": item_name,
+        "quantity": quantity,
+        "unit_price": unit_price,
+        "discount_percentage": discount_percentage,
+        "discounted_unit_price": discounted_unit_price,
+        "total_price": total_price
+    }
+
+def format_quote_explanation(items: List[Dict], total_amount: float, delivery_date: str) -> str:
+    """
+    Format a detailed quote explanation with breakdown of costs.
+
+    Args:
+        items (List[Dict]): List of items with their quantities and prices
+        total_amount (float): The total amount for the quote
+        delivery_date (str): The expected delivery date
+
+    Returns:
+        str: A formatted quote explanation
+    """
+    explanation = "Thank you for your order! "
+
+    # Add details for each item
+    for item in items:
+        item_name = item["item_name"]
+        quantity = item["quantity"]
+        unit_price = item["unit_price"]
+        discount_percentage = item["discount_percentage"]
+        total_price = item["total_price"]
+
+        if discount_percentage > 0:
+            explanation += f"For {quantity} {item_name} at ${unit_price:.2f} each with a {discount_percentage}% bulk discount, the cost is ${total_price:.2f}. "
+        else:
+            explanation += f"For {quantity} {item_name} at ${unit_price:.2f} each, the cost is ${total_price:.2f}. "
+
+    # Add total and delivery information
+    explanation += f"The total cost for your order is ${total_amount:.2f}, and it will be delivered by {delivery_date}."
+
+    return explanation
+
+def generate_quote(request: str, request_date: str) -> Dict:
+    """
+    Generate a complete quote based on a customer request.
+
+    Args:
+        request (str): The customer request text
+        request_date (str): The date of the request
+
+    Returns:
+        Dict: A dictionary containing the complete quote information
+    """
+    # Extract items and quantities from the request
+    # This is a simplified version - in a real system, this would use NLP
+    items = []
+
+    # Look for common paper types in the request
+    for item in paper_supplies:
+        item_name = item["item_name"].lower()
+        if item_name in request.lower():
+            # Try to find quantity before the item name
+            request_lower = request.lower()
+            item_index = request_lower.find(item_name)
+
+            # Look for numbers before the item name
+            quantity = 100  # Default quantity
+
+            # Simple regex to find numbers before the item name
+            import re
+            quantity_matches = re.findall(r'(\d+)\s+(?:sheets|reams|rolls|packs|boxes)?\s+(?:of\s+)?(?:.*?)?' + re.escape(item_name), request_lower)
+
+            if quantity_matches:
+                quantity = int(quantity_matches[0])
+
+            items.append({
+                "item_name": item["item_name"],
+                "quantity": quantity
+            })
+
+    # If no items were found, add some default items
+    if not items:
+        items.append({
+            "item_name": "A4 paper",
+            "quantity": 500
+        })
+
+    # Calculate prices and discounts for each item
+    total_amount = 0
+    for i, item in enumerate(items):
+        discount_info = calculate_bulk_discount(item["item_name"], item["quantity"])
+        items[i].update(discount_info)
+        total_amount += discount_info["total_price"]
+
+    # Round total to a nice number
+    total_amount = round(total_amount)
+
+    # Calculate delivery date
+    # Assume delivery is 7 days from request date
+    from datetime import datetime, timedelta
+    request_date_dt = datetime.fromisoformat(request_date.split("T")[0] if "T" in request_date else request_date)
+    delivery_date = (request_date_dt + timedelta(days=7)).strftime("%Y-%m-%d")
+
+    # Format explanation
+    explanation = format_quote_explanation(items, total_amount, delivery_date)
+
+    # Look for similar quotes in history
+    search_terms = [item["item_name"] for item in items]
+    similar_quotes = search_quote_history(search_terms)
+
+    return {
+        "request": request,
+        "request_date": request_date,
+        "items": items,
+        "total_amount": total_amount,
+        "delivery_date": delivery_date,
+        "explanation": explanation,
+        "similar_quotes": similar_quotes
+    }
 
 
 # Tools for ordering agent
+def process_order(items: List[Dict], order_date: str) -> Dict:
+    """
+    Process an order by creating sales transactions and arranging for restocking if needed.
 
+    Args:
+        items (List[Dict]): List of items with their quantities and prices
+        order_date (str): The date of the order
+
+    Returns:
+        Dict: A dictionary containing order processing information
+    """
+    order_results = []
+    total_sales_amount = 0
+    restock_items = []
+
+    for item in items:
+        item_name = item["item_name"]
+        quantity = item["quantity"]
+        price = item.get("total_price", 0)
+
+        # Check inventory status
+        inventory_status = check_inventory_status(item_name, quantity, order_date)
+
+        if inventory_status["available"]:
+            # Create sales transaction
+            try:
+                transaction_id = create_transaction(
+                    item_name=item_name,
+                    transaction_type="sales",
+                    quantity=quantity,
+                    price=price,
+                    date=order_date
+                )
+
+                order_results.append({
+                    "item_name": item_name,
+                    "quantity": quantity,
+                    "price": price,
+                    "status": "Processed",
+                    "transaction_id": transaction_id
+                })
+
+                total_sales_amount += price
+
+                # Check if restocking is needed
+                if inventory_status["needs_restock"]:
+                    restock_items.append({
+                        "item_name": item_name,
+                        "quantity": inventory_status["restock_quantity"],
+                        "min_stock_level": inventory_status["min_stock_level"]
+                    })
+            except Exception as e:
+                order_results.append({
+                    "item_name": item_name,
+                    "quantity": quantity,
+                    "price": price,
+                    "status": f"Error: {str(e)}",
+                    "transaction_id": None
+                })
+        else:
+            order_results.append({
+                "item_name": item_name,
+                "quantity": quantity,
+                "price": price,
+                "status": "Insufficient stock",
+                "transaction_id": None
+            })
+
+            # Add to restock items
+            restock_items.append({
+                "item_name": item_name,
+                "quantity": max(quantity, inventory_status["restock_quantity"]),
+                "min_stock_level": inventory_status.get("min_stock_level", 100)
+            })
+
+    # Process restocking for items that need it
+    restock_results = []
+    for restock_item in restock_items:
+        item_name = restock_item["item_name"]
+        restock_quantity = restock_item["quantity"]
+
+        # Get unit price from inventory
+        inventory_query = f"SELECT unit_price FROM inventory WHERE item_name = '{item_name}'"
+        price_result = pd.read_sql(inventory_query, db_engine)
+
+        if not price_result.empty:
+            unit_price = price_result["unit_price"].iloc[0]
+            restock_price = restock_quantity * unit_price / DEFUALT_MARKUP  # Cost to restock
+
+            # Calculate supplier delivery date
+            supplier_delivery_date = get_supplier_delivery_date(order_date, restock_quantity)
+
+            try:
+                # Create stock order transaction
+                transaction_id = create_transaction(
+                    item_name=item_name,
+                    transaction_type="stock_orders",
+                    quantity=restock_quantity,
+                    price=restock_price,
+                    date=supplier_delivery_date
+                )
+
+                restock_results.append({
+                    "item_name": item_name,
+                    "quantity": restock_quantity,
+                    "price": restock_price,
+                    "status": "Restocked",
+                    "delivery_date": supplier_delivery_date,
+                    "transaction_id": transaction_id
+                })
+            except Exception as e:
+                restock_results.append({
+                    "item_name": item_name,
+                    "quantity": restock_quantity,
+                    "price": restock_price,
+                    "status": f"Restock Error: {str(e)}",
+                    "delivery_date": supplier_delivery_date,
+                    "transaction_id": None
+                })
+        else:
+            restock_results.append({
+                "item_name": item_name,
+                "quantity": restock_quantity,
+                "price": 0,
+                "status": "Item not found in inventory",
+                "delivery_date": None,
+                "transaction_id": None
+            })
+
+    return {
+        "order_date": order_date,
+        "total_sales_amount": total_sales_amount,
+        "order_results": order_results,
+        "restock_results": restock_results,
+        "all_items_processed": all(result["status"] == "Processed" for result in order_results)
+    }
+
+def check_order_status(order_id: int, as_of_date: str) -> Dict:
+    """
+    Check the status of an order based on its transactions.
+
+    Args:
+        order_id (int): The ID of the order to check
+        as_of_date (str): The date to check the status as of
+
+    Returns:
+        Dict: A dictionary containing order status information
+    """
+    # In a real system, we would have an orders table to track this
+    # For this implementation, we'll use the transaction ID as the order ID
+
+    # Get the transaction
+    query = f"""
+        SELECT * FROM transactions 
+        WHERE id = {order_id} 
+        AND transaction_date <= '{as_of_date}'
+    """
+
+    transaction = pd.read_sql(query, db_engine)
+
+    if transaction.empty:
+        return {
+            "order_id": order_id,
+            "status": "Not found",
+            "details": "No transaction found with this ID"
+        }
+
+    # Get transaction details
+    transaction_type = transaction["transaction_type"].iloc[0]
+    item_name = transaction["item_name"].iloc[0]
+    quantity = transaction["units"].iloc[0]
+    price = transaction["price"].iloc[0]
+    transaction_date = transaction["transaction_date"].iloc[0]
+
+    if transaction_type == "sales":
+        # Check if the item is still in stock
+        inventory_status = check_inventory_status(item_name, quantity, as_of_date)
+
+        return {
+            "order_id": order_id,
+            "status": "Completed" if inventory_status["available"] else "Partially Fulfilled",
+            "transaction_type": transaction_type,
+            "item_name": item_name,
+            "quantity": quantity,
+            "price": price,
+            "transaction_date": transaction_date,
+            "inventory_status": inventory_status
+        }
+    else:  # stock_orders
+        # Calculate expected delivery date
+        supplier_delivery_date = get_supplier_delivery_date(transaction_date, quantity)
+
+        # Check if the delivery date has passed
+        from datetime import datetime
+        as_of_date_dt = datetime.fromisoformat(as_of_date.split("T")[0] if "T" in as_of_date else as_of_date)
+        delivery_date_dt = datetime.fromisoformat(supplier_delivery_date)
+
+        status = "Delivered" if as_of_date_dt >= delivery_date_dt else "In Transit"
+
+        return {
+            "order_id": order_id,
+            "status": status,
+            "transaction_type": transaction_type,
+            "item_name": item_name,
+            "quantity": quantity,
+            "price": price,
+            "transaction_date": transaction_date,
+            "expected_delivery_date": supplier_delivery_date
+        }
+
+
+# Tools for financial agent
+def get_financial_status(as_of_date: str) -> Dict:
+    """
+    Get comprehensive financial status information as of a specific date.
+
+    Args:
+        as_of_date (str): The date to get financial status for
+
+    Returns:
+        Dict: A dictionary containing financial status information
+    """
+    # Generate a complete financial report
+    financial_report = generate_financial_report(as_of_date)
+
+    # Get cash balance
+    cash_balance = financial_report["cash_balance"]
+
+    # Get inventory value
+    inventory_value = financial_report["inventory_value"]
+
+    # Get top selling products
+    top_selling_products = financial_report["top_selling_products"]
+
+    # Calculate total assets
+    total_assets = cash_balance + inventory_value
+
+    # Get recent transactions
+    recent_transactions_query = f"""
+        SELECT * FROM transactions
+        WHERE transaction_date <= '{as_of_date}'
+        ORDER BY transaction_date DESC
+        LIMIT 10
+    """
+    recent_transactions = pd.read_sql(recent_transactions_query, db_engine).to_dict(orient="records")
+
+    # Calculate revenue and expenses for the last 30 days
+    from datetime import datetime, timedelta
+    as_of_date_dt = datetime.fromisoformat(as_of_date.split("T")[0] if "T" in as_of_date else as_of_date)
+    thirty_days_ago = (as_of_date_dt - timedelta(days=30)).isoformat()
+
+    revenue_query = f"""
+        SELECT SUM(price) as revenue
+        FROM transactions
+        WHERE transaction_type = 'sales'
+        AND transaction_date BETWEEN '{thirty_days_ago}' AND '{as_of_date}'
+    """
+    revenue_result = pd.read_sql(revenue_query, db_engine)
+    revenue_30_days = float(revenue_result["revenue"].iloc[0]) if not revenue_result.empty and not pd.isna(revenue_result["revenue"].iloc[0]) else 0.0
+
+    expenses_query = f"""
+        SELECT SUM(price) as expenses
+        FROM transactions
+        WHERE transaction_type = 'stock_orders'
+        AND transaction_date BETWEEN '{thirty_days_ago}' AND '{as_of_date}'
+    """
+    expenses_result = pd.read_sql(expenses_query, db_engine)
+    expenses_30_days = float(expenses_result["expenses"].iloc[0]) if not expenses_result.empty and not pd.isna(expenses_result["expenses"].iloc[0]) else 0.0
+
+    # Calculate profit for the last 30 days
+    profit_30_days = revenue_30_days - expenses_30_days
+
+    # Calculate profit margin
+    profit_margin = (profit_30_days / revenue_30_days * 100) if revenue_30_days > 0 else 0
+
+    return {
+        "as_of_date": as_of_date,
+        "cash_balance": cash_balance,
+        "inventory_value": inventory_value,
+        "total_assets": total_assets,
+        "revenue_30_days": revenue_30_days,
+        "expenses_30_days": expenses_30_days,
+        "profit_30_days": profit_30_days,
+        "profit_margin": profit_margin,
+        "top_selling_products": top_selling_products,
+        "recent_transactions": recent_transactions,
+        "inventory_summary": financial_report["inventory_summary"]
+    }
 
 # Set up your agents and create an orchestration agent that will manage them.
+# Define the agents using the smolagents framework
+
+# Inventory Agent
+class InventoryAgent(ToolCallingAgent):
+    def __init__(self, model):
+        super().__init__(model=model)
+
+    @tool
+    def check_inventory(self, item_name: str, quantity: int, as_of_date: str) -> Dict:
+        """
+        Check if the requested item is available in sufficient quantity.
+
+        Args:
+            item_name (str): The name of the item to check
+            quantity (int): The requested quantity
+            as_of_date (str): The date to check inventory as of
+
+        Returns:
+            Dict: Inventory status information
+        """
+        return check_inventory_status(item_name, quantity, as_of_date)
+
+    @tool
+    def get_inventory_status(self, as_of_date: str) -> Dict:
+        """
+        Get a comprehensive inventory report.
+
+        Args:
+            as_of_date (str): The date to generate the report for
+
+        Returns:
+            Dict: Inventory report information
+        """
+        return get_inventory_report(as_of_date)
+
+# Quote Agent
+class QuoteAgent(ToolCallingAgent):
+    def __init__(self, model):
+        super().__init__(model=model)
+
+    @tool
+    def generate_quote(self, request: str, request_date: str) -> Dict:
+        """
+        Generate a quote based on a customer request.
+
+        Args:
+            request (str): The customer request text
+            request_date (str): The date of the request
+
+        Returns:
+            Dict: Quote information
+        """
+        return generate_quote(request, request_date)
+
+    @tool
+    def calculate_item_discount(self, item_name: str, quantity: int) -> Dict:
+        """
+        Calculate the discount for a specific item based on quantity.
+
+        Args:
+            item_name (str): The name of the item
+            quantity (int): The quantity ordered
+
+        Returns:
+            Dict: Discount information
+        """
+        return calculate_bulk_discount(item_name, quantity)
+
+    @tool
+    def search_similar_quotes(self, search_terms: List[str], limit: int = 5) -> List[Dict]:
+        """
+        Search for similar quotes in history.
+
+        Args:
+            search_terms (List[str]): Terms to search for
+            limit (int): Maximum number of quotes to return
+
+        Returns:
+            List[Dict]: Similar quotes
+        """
+        return search_quote_history(search_terms, limit)
+
+# Order Fulfillment Agent
+class OrderFulfillmentAgent(ToolCallingAgent):
+    def __init__(self, model):
+        super().__init__(model=model)
+
+    @tool
+    def process_order(self, items: List[Dict], order_date: str) -> Dict:
+        """
+        Process an order by creating sales transactions and arranging for restocking.
+
+        Args:
+            items (List[Dict]): List of items with their quantities and prices
+            order_date (str): The date of the order
+
+        Returns:
+            Dict: Order processing information
+        """
+        return process_order(items, order_date)
+
+    @tool
+    def check_order_status(self, order_id: int, as_of_date: str) -> Dict:
+        """
+        Check the status of an order.
+
+        Args:
+            order_id (int): The ID of the order to check
+            as_of_date (str): The date to check the status as of
+
+        Returns:
+            Dict: Order status information
+        """
+        return check_order_status(order_id, as_of_date)
+
+    @tool
+    def get_delivery_date(self, order_date: str, quantity: int) -> str:
+        """
+        Calculate the expected delivery date for an order.
+
+        Args:
+            order_date (str): The date the order was placed
+            quantity (int): The quantity ordered
+
+        Returns:
+            str: Expected delivery date
+        """
+        return get_supplier_delivery_date(order_date, quantity)
+
+# Financial Agent
+class FinancialAgent(ToolCallingAgent):
+    def __init__(self, model):
+        super().__init__(model=model)
+
+    @tool
+    def get_financial_status(self, as_of_date: str) -> Dict:
+        """
+        Get comprehensive financial status information.
+
+        Args:
+            as_of_date (str): The date to get financial status for
+
+        Returns:
+            Dict: Financial status information
+        """
+        return get_financial_status(as_of_date)
+
+    @tool
+    def get_cash_balance(self, as_of_date: str) -> float:
+        """
+        Get the current cash balance.
+
+        Args:
+            as_of_date (str): The date to get the cash balance for
+
+        Returns:
+            float: Cash balance
+        """
+        return get_cash_balance(as_of_date)
+
+    @tool
+    def generate_report(self, as_of_date: str) -> Dict:
+        """
+        Generate a complete financial report.
+
+        Args:
+            as_of_date (str): The date to generate the report for
+
+        Returns:
+            Dict: Financial report
+        """
+        return generate_financial_report(as_of_date)
+
+# Orchestrator Agent
+class OrchestratorAgent(ToolCallingAgent):
+    def __init__(self, model, inventory_agent, quote_agent, order_agent, financial_agent):
+        super().__init__(model=model)
+        self.inventory_agent = inventory_agent
+        self.quote_agent = quote_agent
+        self.order_agent = order_agent
+        self.financial_agent = financial_agent
+
+    @tool
+    def parse_request(self, request: str) -> Dict:
+        """
+        Parse a customer request to extract key information.
+
+        Args:
+            request (str): The customer request text
+
+        Returns:
+            Dict: Extracted information from the request
+        """
+        # Extract date from request if present
+        import re
+        date_match = re.search(r'Date of request: (\d{4}-\d{2}-\d{2})', request)
+        request_date = date_match.group(1) if date_match else datetime.now().strftime("%Y-%m-%d")
+
+        # Look for common paper types in the request
+        requested_items = []
+        for item in paper_supplies:
+            item_name = item["item_name"].lower()
+            if item_name in request.lower():
+                # Try to find quantity before the item name
+                quantity_matches = re.findall(r'(\d+)\s+(?:sheets|reams|rolls|packs|boxes)?\s+(?:of\s+)?(?:.*?)?' + re.escape(item_name), request.lower())
+
+                quantity = 100  # Default quantity
+                if quantity_matches:
+                    quantity = int(quantity_matches[0])
+
+                requested_items.append({
+                    "item_name": item["item_name"],
+                    "quantity": quantity
+                })
+
+        # Extract delivery date if present
+        delivery_match = re.search(r'(?:deliver|delivery).*?by\s+(\w+\s+\d+,?\s+\d{4})', request, re.IGNORECASE)
+        delivery_date = None
+        if delivery_match:
+            try:
+                from dateutil import parser
+                delivery_date = parser.parse(delivery_match.group(1)).strftime("%Y-%m-%d")
+            except:
+                delivery_date = None
+
+        return {
+            "request_text": request,
+            "request_date": request_date,
+            "requested_items": requested_items,
+            "requested_delivery_date": delivery_date
+        }
+
+    @tool
+    def handle_request(self, request: str) -> str:
+        """
+        Handle a customer request by coordinating with specialized agents.
+
+        Args:
+            request (str): The customer request text
+
+        Returns:
+            str: Response to the customer
+        """
+        # Parse the request
+        parsed_request = self.parse_request(request)
+        request_date = parsed_request["request_date"]
+
+        # Check inventory for requested items
+        inventory_checks = []
+        for item in parsed_request["requested_items"]:
+            inventory_status = self.inventory_agent.check_inventory(
+                item_name=item["item_name"],
+                quantity=item["quantity"],
+                as_of_date=request_date
+            )
+            inventory_checks.append(inventory_status)
+
+        # Generate a quote
+        quote = self.quote_agent.generate_quote(request, request_date)
+
+        # Process the order if all items are available
+        all_available = all(check["available"] for check in inventory_checks)
+        order_result = None
+        if all_available:
+            order_result = self.order_agent.process_order(quote["items"], request_date)
+
+        # Get financial status after processing
+        financial_status = self.financial_agent.get_financial_status(request_date)
+
+        # Formulate response
+        if all_available and order_result and order_result["all_items_processed"]:
+            response = f"{quote['explanation']} Your order has been processed successfully. Thank you for your business!"
+        elif not all_available:
+            unavailable_items = [check["item_name"] for check in inventory_checks if not check["available"]]
+            response = f"We apologize, but the following items are not available in the requested quantity: {', '.join(unavailable_items)}. {quote['explanation']} We can process your order once these items are back in stock."
+        else:
+            response = f"There was an issue processing your order. {quote['explanation']} Please contact customer service for assistance."
+
+        return response
+
+# Initialize the agents
+inventory_agent = InventoryAgent(model)
+quote_agent = QuoteAgent(model)
+order_agent = OrderFulfillmentAgent(model)
+financial_agent = FinancialAgent(model)
+orchestrator = OrchestratorAgent(model, inventory_agent, quote_agent, order_agent, financial_agent)
 
 
 # Run your test scenarios by writing them here. Make sure to keep track of them.
 
 def run_test_scenarios():
-    
+
     print("Initializing Database...")
     init_database()
     try:
@@ -644,13 +1511,13 @@ def run_test_scenarios():
     current_cash = report["cash_balance"]
     current_inventory = report["inventory_value"]
 
-    ############
-    ############
-    ############
-    # INITIALIZE YOUR MULTI AGENT SYSTEM HERE
-    ############
-    ############
-    ############
+    # Our multi-agent system is already initialized above
+    # We have:
+    # - inventory_agent: For inventory operations
+    # - quote_agent: For generating quotes
+    # - order_agent: For order fulfillment
+    # - financial_agent: For financial operations
+    # - orchestrator: The main agent that coordinates everything
 
     results = []
     for idx, row in quote_requests_sample.iterrows():
@@ -665,15 +1532,8 @@ def run_test_scenarios():
         # Process request
         request_with_date = f"{row['request']} (Date of request: {request_date})"
 
-        ############
-        ############
-        ############
-        # USE YOUR MULTI AGENT SYSTEM TO HANDLE THE REQUEST
-        ############
-        ############
-        ############
-
-        # response = call_your_multi_agent_system(request_with_date)
+        # Use our orchestrator agent to handle the request
+        response = orchestrator.handle_request(request_with_date)
 
         # Update state
         report = generate_financial_report(request_date)
