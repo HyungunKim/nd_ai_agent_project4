@@ -11,6 +11,7 @@ from sqlalchemy import create_engine, Engine
 import logging
 from smolagents import (
     ToolCallingAgent,
+    CodeAgent,
     OpenAIServerModel,
     tool,
 )
@@ -137,7 +138,7 @@ def generate_sample_inventory(paper_supplies: list, coverage: float = 0.4, seed:
     # Return inventory as a pandas DataFrame
     return pd.DataFrame(inventory)
 
-def init_database(db_engine: Engine = db_engine, seed: int = 137) -> Engine:    
+def init_database(db_engine: Engine = db_engine, seed: int = 137) -> Engine:
     """
     Set up the Munder Difflin database with all required tables and initial records.
 
@@ -615,7 +616,7 @@ model = OpenAIServerModel(
 )
 
 # Tools for inventory agent
-
+@tool
 def check_inventory_status(item_name: str, quantity: int, as_of_date: str) -> Dict:
     """
     Check if the requested item is available in sufficient quantity and provide inventory status.
@@ -677,6 +678,7 @@ def check_inventory_status(item_name: str, quantity: int, as_of_date: str) -> Di
         "restock_quantity": restock_quantity if needs_restock else 0
     }
 
+@tool
 def get_inventory_report(as_of_date: str) -> Dict:
     """
     Generate a comprehensive inventory report as of a specific date.
@@ -733,6 +735,7 @@ def get_inventory_report(as_of_date: str) -> Dict:
 
 
 # Tools for quoting agent
+@tool
 def calculate_bulk_discount(item_name: str, quantity: int) -> Dict:
     """
     Calculate the appropriate bulk discount for an item based on quantity.
@@ -790,6 +793,7 @@ def calculate_bulk_discount(item_name: str, quantity: int) -> Dict:
         "total_price": total_price
     }
 
+@tool
 def format_quote_explanation(items: List[Dict], total_amount: float, delivery_date: str) -> str:
     """
     Format a detailed quote explanation with breakdown of costs.
@@ -822,6 +826,7 @@ def format_quote_explanation(items: List[Dict], total_amount: float, delivery_da
 
     return explanation
 
+@tool
 def generate_quote(request: str, request_date: str) -> Dict:
     """
     Generate a complete quote based on a customer request.
@@ -901,7 +906,8 @@ def generate_quote(request: str, request_date: str) -> Dict:
     }
 
 
-# Tools for ordering agent
+# Tools for ordering agent1
+@tool
 def process_order(items: List[Dict], order_date: str) -> Dict:
     """
     Process an order by creating sales transactions and arranging for restocking if needed.
@@ -1039,6 +1045,7 @@ def process_order(items: List[Dict], order_date: str) -> Dict:
         "all_items_processed": all(result["status"] == "Processed" for result in order_results)
     }
 
+@tool
 def check_order_status(order_id: int, as_of_date: str) -> Dict:
     """
     Check the status of an order based on its transactions.
@@ -1114,6 +1121,7 @@ def check_order_status(order_id: int, as_of_date: str) -> Dict:
 
 
 # Tools for financial agent
+@tool
 def get_financial_status(as_of_date: str) -> Dict:
     """
     Get comprehensive financial status information as of a specific date.
@@ -1191,293 +1199,101 @@ def get_financial_status(as_of_date: str) -> Dict:
         "inventory_summary": financial_report["inventory_summary"]
     }
 
+# tool for orchestrator agent
+@tool
+def parse_request(request: str) -> Dict:
+    """
+    Parse a customer request to extract key information.
+
+    Args:
+        request (str): The customer request text
+
+    Returns:
+        Dict: Extracted information from the request
+    """
+    # Extract date from request if present
+    import re
+    date_match = re.search(r'Date of request: (\d{4}-\d{2}-\d{2})', request)
+    request_date = date_match.group(1) if date_match else datetime.now().strftime("%Y-%m-%d")
+
+    # Look for common paper types in the request
+    requested_items = []
+    for item in paper_supplies:
+        item_name = item["item_name"].lower()
+        if item_name in request.lower():
+            # Try to find quantity before the item name
+            quantity_matches = re.findall(r'(\d+)\s+(?:sheets|reams|rolls|packs|boxes)?\s+(?:of\s+)?(?:.*?)?' + re.escape(item_name), request.lower())
+
+            quantity = 100  # Default quantity
+            if quantity_matches:
+                quantity = int(quantity_matches[0])
+
+            requested_items.append({
+                "item_name": item["item_name"],
+                "quantity": quantity
+            })
+
+    # Extract delivery date if present
+    delivery_match = re.search(r'(?:deliver|delivery).*?by\s+(\w+\s+\d+,?\s+\d{4})', request, re.IGNORECASE)
+    delivery_date = None
+    if delivery_match:
+        try:
+            from dateutil import parser
+            delivery_date = parser.parse(delivery_match.group(1)).strftime("%Y-%m-%d")
+        except:
+            delivery_date = None
+
+    return {
+        "request_text": request,
+        "request_date": request_date,
+        "requested_items": requested_items,
+        "requested_delivery_date": delivery_date
+    }
+
 # Set up your agents and create an orchestration agent that will manage them.
 # Define the agents using the smolagents framework
-
-# Inventory Agent
-class InventoryAgent(ToolCallingAgent):
-    def __init__(self, model):
-        super().__init__(model=model)
-
-    @tool
-    def check_inventory(self, item_name: str, quantity: int, as_of_date: str) -> Dict:
-        """
-        Check if the requested item is available in sufficient quantity.
-
-        Args:
-            item_name (str): The name of the item to check
-            quantity (int): The requested quantity
-            as_of_date (str): The date to check inventory as of
-
-        Returns:
-            Dict: Inventory status information
-        """
-        return check_inventory_status(item_name, quantity, as_of_date)
-
-    @tool
-    def get_inventory_status(self, as_of_date: str) -> Dict:
-        """
-        Get a comprehensive inventory report.
-
-        Args:
-            as_of_date (str): The date to generate the report for
-
-        Returns:
-            Dict: Inventory report information
-        """
-        return get_inventory_report(as_of_date)
-
-# Quote Agent
-class QuoteAgent(ToolCallingAgent):
-    def __init__(self, model):
-        super().__init__(model=model)
-
-    @tool
-    def generate_quote(self, request: str, request_date: str) -> Dict:
-        """
-        Generate a quote based on a customer request.
-
-        Args:
-            request (str): The customer request text
-            request_date (str): The date of the request
-
-        Returns:
-            Dict: Quote information
-        """
-        return generate_quote(request, request_date)
-
-    @tool
-    def calculate_item_discount(self, item_name: str, quantity: int) -> Dict:
-        """
-        Calculate the discount for a specific item based on quantity.
-
-        Args:
-            item_name (str): The name of the item
-            quantity (int): The quantity ordered
-
-        Returns:
-            Dict: Discount information
-        """
-        return calculate_bulk_discount(item_name, quantity)
-
-    @tool
-    def search_similar_quotes(self, search_terms: List[str], limit: int = 5) -> List[Dict]:
-        """
-        Search for similar quotes in history.
-
-        Args:
-            search_terms (List[str]): Terms to search for
-            limit (int): Maximum number of quotes to return
-
-        Returns:
-            List[Dict]: Similar quotes
-        """
-        return search_quote_history(search_terms, limit)
-
-# Order Fulfillment Agent
-class OrderFulfillmentAgent(ToolCallingAgent):
-    def __init__(self, model):
-        super().__init__(model=model)
-
-    @tool
-    def process_order(self, items: List[Dict], order_date: str) -> Dict:
-        """
-        Process an order by creating sales transactions and arranging for restocking.
-
-        Args:
-            items (List[Dict]): List of items with their quantities and prices
-            order_date (str): The date of the order
-
-        Returns:
-            Dict: Order processing information
-        """
-        return process_order(items, order_date)
-
-    @tool
-    def check_order_status(self, order_id: int, as_of_date: str) -> Dict:
-        """
-        Check the status of an order.
-
-        Args:
-            order_id (int): The ID of the order to check
-            as_of_date (str): The date to check the status as of
-
-        Returns:
-            Dict: Order status information
-        """
-        return check_order_status(order_id, as_of_date)
-
-    @tool
-    def get_delivery_date(self, order_date: str, quantity: int) -> str:
-        """
-        Calculate the expected delivery date for an order.
-
-        Args:
-            order_date (str): The date the order was placed
-            quantity (int): The quantity ordered
-
-        Returns:
-            str: Expected delivery date
-        """
-        return get_supplier_delivery_date(order_date, quantity)
 
 # Financial Agent
 class FinancialAgent(ToolCallingAgent):
     def __init__(self, model):
-        super().__init__(model=model)
+        super().__init__
 
-    @tool
-    def get_financial_status(self, as_of_date: str) -> Dict:
-        """
-        Get comprehensive financial status information.
-
-        Args:
-            as_of_date (str): The date to get financial status for
-
-        Returns:
-            Dict: Financial status information
-        """
-        return get_financial_status(as_of_date)
-
-    @tool
-    def get_cash_balance(self, as_of_date: str) -> float:
-        """
-        Get the current cash balance.
-
-        Args:
-            as_of_date (str): The date to get the cash balance for
-
-        Returns:
-            float: Cash balance
-        """
-        return get_cash_balance(as_of_date)
-
-    @tool
-    def generate_report(self, as_of_date: str) -> Dict:
-        """
-        Generate a complete financial report.
-
-        Args:
-            as_of_date (str): The date to generate the report for
-
-        Returns:
-            Dict: Financial report
-        """
-        return generate_financial_report(as_of_date)
-
-# Orchestrator Agent
-class OrchestratorAgent(ToolCallingAgent):
-    def __init__(self, model, inventory_agent, quote_agent, order_agent, financial_agent):
-        super().__init__(model=model)
-        self.inventory_agent = inventory_agent
-        self.quote_agent = quote_agent
-        self.order_agent = order_agent
-        self.financial_agent = financial_agent
-
-    @tool
-    def parse_request(self, request: str) -> Dict:
-        """
-        Parse a customer request to extract key information.
-
-        Args:
-            request (str): The customer request text
-
-        Returns:
-            Dict: Extracted information from the request
-        """
-        # Extract date from request if present
-        import re
-        date_match = re.search(r'Date of request: (\d{4}-\d{2}-\d{2})', request)
-        request_date = date_match.group(1) if date_match else datetime.now().strftime("%Y-%m-%d")
-
-        # Look for common paper types in the request
-        requested_items = []
-        for item in paper_supplies:
-            item_name = item["item_name"].lower()
-            if item_name in request.lower():
-                # Try to find quantity before the item name
-                quantity_matches = re.findall(r'(\d+)\s+(?:sheets|reams|rolls|packs|boxes)?\s+(?:of\s+)?(?:.*?)?' + re.escape(item_name), request.lower())
-
-                quantity = 100  # Default quantity
-                if quantity_matches:
-                    quantity = int(quantity_matches[0])
-
-                requested_items.append({
-                    "item_name": item["item_name"],
-                    "quantity": quantity
-                })
-
-        # Extract delivery date if present
-        delivery_match = re.search(r'(?:deliver|delivery).*?by\s+(\w+\s+\d+,?\s+\d{4})', request, re.IGNORECASE)
-        delivery_date = None
-        if delivery_match:
-            try:
-                from dateutil import parser
-                delivery_date = parser.parse(delivery_match.group(1)).strftime("%Y-%m-%d")
-            except:
-                delivery_date = None
-
-        return {
-            "request_text": request,
-            "request_date": request_date,
-            "requested_items": requested_items,
-            "requested_delivery_date": delivery_date
-        }
-
-    @tool
-    def handle_request(self, request: str) -> str:
-        """
-        Handle a customer request by coordinating with specialized agents.
-
-        Args:
-            request (str): The customer request text
-
-        Returns:
-            str: Response to the customer
-        """
-        # Parse the request
-        parsed_request = self.parse_request(request)
-        request_date = parsed_request["request_date"]
-
-        # Check inventory for requested items
-        inventory_checks = []
-        for item in parsed_request["requested_items"]:
-            inventory_status = self.inventory_agent.check_inventory(
-                item_name=item["item_name"],
-                quantity=item["quantity"],
-                as_of_date=request_date
-            )
-            inventory_checks.append(inventory_status)
-
-        # Generate a quote
-        quote = self.quote_agent.generate_quote(request, request_date)
-
-        # Process the order if all items are available
-        all_available = all(check["available"] for check in inventory_checks)
-        order_result = None
-        if all_available:
-            order_result = self.order_agent.process_order(quote["items"], request_date)
-
-        # Get financial status after processing
-        financial_status = self.financial_agent.get_financial_status(request_date)
-
-        # Formulate response
-        if all_available and order_result and order_result["all_items_processed"]:
-            response = f"{quote['explanation']} Your order has been processed successfully. Thank you for your business!"
-        elif not all_available:
-            unavailable_items = [check["item_name"] for check in inventory_checks if not check["available"]]
-            response = f"We apologize, but the following items are not available in the requested quantity: {', '.join(unavailable_items)}. {quote['explanation']} We can process your order once these items are back in stock."
-        else:
-            response = f"There was an issue processing your order. {quote['explanation']} Please contact customer service for assistance."
-
-        return response
 
 # Initialize the agents
-inventory_agent = InventoryAgent(model)
-quote_agent = QuoteAgent(model)
-order_agent = OrderFulfillmentAgent(model)
-financial_agent = FinancialAgent(model)
-orchestrator = OrchestratorAgent(model, inventory_agent, quote_agent, order_agent, financial_agent)
+inventory_agent = ToolCallingAgent(model=model,
+                         tools=[check_inventory_status, get_inventory_report],
+                         instructions="""
+                         You are a ...
+                         """,
+                         description="""
+                         The agent for handling inventory logic. It has access to tools such as
+                         """)
+
+quote_agent = ToolCallingAgent(model=model,
+                         tools=[generate_quote,
+                                calculate_bulk_discount,
+                                search_quote_history],
+                         instructions="""
+                         """,
+                         description="""
+                         """)
+order_agent = ToolCallingAgent(model=model,
+                         tools=[process_order, check_order_status, get_supplier_delivery_date],
+                         instructions="""
+                         """,
+                         description="""
+                         """)
+financial_agent = ToolCallingAgent(model=model,
+                         tools=[get_financial_status, get_cash_balance, generate_financial_report],
+                         instructions="""
+                         """,
+                         description="""
+                         """)
+orchestrator = CodeAgent(model,
+                         tools=[parse_request],
+                         instructions="""
+                         """,
+                         managed_agents=[inventory_agent, quote_agent, order_agent, financial_agent])
 
 
 # Run your test scenarios by writing them here. Make sure to keep track of them.
