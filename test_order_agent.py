@@ -27,7 +27,6 @@ def order_agent():
         api_base="https://openai.vocareum.com/v1",
         api_key=openai_api_key,
     )
-
     # Initialize the database
     init_database()
 
@@ -36,6 +35,9 @@ def order_agent():
         model=model,
         tools=[process_order, check_order_status, get_supplier_delivery_date],
         name="OrderAgent",
+        instructions="""
+        you are a helpful agent. you will get order request from client. you can process order, check order status, get supplier delivery date.
+        """,
         description="""
         The agent for processing orders. It has access to tools such as process_order, check_order_status, get_supplier_delivery_date.
         """
@@ -90,21 +92,22 @@ def test_order_agent_process_order(order_agent):
     # The response should mention the order or processing
     assert "order" in response.lower() or "process" in response.lower()
     # The response should mention Copy Paper
-    assert "Copy Paper" in response
+    assert "A4 paper" in response
 
 def test_order_agent_check_status(order_agent):
     """Test the order agent's ability to check an order status."""
     # First create an order to get an order ID
-    items = [OrderItem(item_name="Copy Paper", quantity=10)]
-    order = process_order(items, "2023-01-01")
-
+    items = [OrderItem(item_name="A4 paper", quantity=10)]
+    order = process_order(items, "2025-08-01")
+    print(order)
     # Get the transaction ID from the first order result
     if order.order_results and len(order.order_results) > 0:
         transaction_id = order.order_results[0].transaction_id
         if transaction_id:
-            query = f"What is the status of order {transaction_id}?"
+            query = f"What is the status of order {transaction_id}? (Date of request: 2025-08-01)"
             response = order_agent.run(query)
-
+            print()
+            print(response)
             # Verify the response contains relevant information
             assert response is not None
             assert isinstance(response, str)

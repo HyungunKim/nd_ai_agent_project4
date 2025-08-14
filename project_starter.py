@@ -1164,12 +1164,12 @@ def format_quote_explanation(items: List[Dict], total_amount: float, delivery_da
 
 # Tools for ordering agent1
 @tool
-def process_order(items: List[Union[Dict, OrderItem]], order_date: str) -> Order:
+def process_order(items: List[Union[OrderItem]], order_date: str) -> Order:
     """
     Process an order by creating sales transactions and arranging for restocking if needed.
 
     Args:
-        items (List[Union[Dict, OrderItem]]): List of items with their quantities and prices
+        items (List[Union[OrderItem]]): List of items with their quantities and prices
             class OrderItem(BaseModel):
                 item_name: str
                 quantity: int
@@ -1542,6 +1542,9 @@ quote_agent = ToolCallingAgent(model=model,
 order_agent = ToolCallingAgent(model=model,
                          tools=[process_order, check_order_status, get_supplier_delivery_date],
                          name="OrderAgent",
+                         instructions="""
+                                 you are a helpful agent. you will get order request from client. you can process order, check order status, get supplier delivery date.
+                                 """,
                          description="""
                          The agent for processing orders. It has access to tools such as `process_order`, `check_order_status`, `get_supplier_delivery_date`.
                          """)
