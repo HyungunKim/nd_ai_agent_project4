@@ -1,0 +1,83 @@
+request_id,request_date,cash_balance,inventory_value,response
+1,2025-04-01,48983.15,2060.6999999999994,"The request for 200 sheets of A4 glossy paper could not be fulfilled due to insufficient stock. However, I can provide a quote for the other items:
+- 100 sheets of Heavy cardstock (white): Total Price is $19.00.
+- 100 sheets of Colored paper (assorted colors): Total Price is $9.50.
+
+The total for the available items is $28.50."
+2,2025-04-03,48983.15,2060.6999999999994,"Currently, there is insufficient stock for the requested items:
+1. **Poster Paper**: Out of stock (200 sheets needed, 0 available).
+2. **Party Streamers**: In stock (799 units available).
+3. **Balloons**: Out of stock (200 needed, 0 available).
+
+Only the party streamers can be fulfilled at this time. Please consider restocking the Poster Paper and Balloons or choosing alternative supplies."
+3,2025-04-04,48983.15,2060.6999999999994,"The order for 10,000 sheets of A4 paper, 5,000 sheets of A3 paper, and 500 reams of printer paper cannot be processed as requested due to insufficient inventory levels. 
+
+1. **A4 Paper**: Only 389 sheets are available, which is insufficient for the order of 10,000 sheets.
+2. **A3 Paper**: There is no stock; 5,000 sheets are required but currently unavailable.
+3. **Printer Paper**: This item is not listed in the available supplies.
+
+To proceed, please consider adjusting the quantities or substituting the printer paper with another available item from the inventory. Additionally, A3 paper requires immediate restocking to fulfill the quantity needed."
+4,2025-04-05,49000.65,2048.1999999999994,"The order for 250 sheets of A4 paper was successfully processed at a total price of $17.5 with transaction ID 29. However, the order for 500 sheets of 250 gsm cardstock could not be fulfilled due to insufficient stock and the item not being found in inventory."
+5,2025-04-05,49088.4,1953.1999999999996,"The order for 500 sheets of Colored paper and 300 sheets of Cardstock has been successfully processed with a total cost of $87.75, and is scheduled for delivery on April 9, 2025. However, the order for 200 rolls of Decorative adhesive tape (washi tape) could not be fulfilled due to insufficient stock."
+6,2025-04-06,49088.4,1953.1999999999996,"The order for paper supplies has been complicated by insufficient stock issues. Here are the details:
+
+**Quote:** 
+- **500 sheets of Construction paper:** $31.50 (after discount).
+- **200 sheets of Colored paper:** $19.00 (after discount).
+- **Total Cost:** $50.50.
+
+The order processing for the Colored paper was unsuccessful due to insufficient stock, but restocking is scheduled for April 10, 2025. 
+Unfortunately, the order for Construction paper could not be fulfilled as restocking was also not possible at this time. Monitoring the stock levels for future orders is advised to prevent supply issues."
+7,2025-04-07,49166.25,1878.4999999999998,"The order could not be fully processed as both A4 glossy paper and A3 matte paper were out of stock and could not be restocked. However, the order for 300 poster boards was successfully processed, with the delivery scheduled for April 11, 2025. The total sales amount for the processed order is $0.0 due to insufficient stock for the majority of the items."
+8,2025-04-07,49266.25,1778.4999999999998,"The order for 500 sheets of A4 glossy paper has been successfully fulfilled for a total of $100. However, the orders for 1000 sheets of A4 matte paper, 2000 sheets of A5 colored paper, and 3000 sheets of A4 recycled paper could not be completed because A4 matte paper and A4 recycled paper are not available in the inventory, and A5 colored paper has just been restocked. Please consider using alternatives for the ceremony."
+9,2025-04-07,49266.25,1778.4999999999998,"The order could not be successfully processed due to insufficient stock of the requested items. A4 paper will be restocked and is expected to be available by April 11, 2025, but A3 matte paper was not found in the inventory. It's advisable to reorder after the A4 paper becomes available and check on the A3 matte paper for future needs."
+13,2025-04-08,49266.25,1778.4999999999998,"The order for 500 sheets of A4 paper and 200 sheets of Cardstock could not be processed due to insufficient stock. Both items will be restocked, and new delivery dates are set for April 12, 2025. The order can potentially be reprocessed for delivery on April 10, 2025, once the stock is available."
+12,2025-04-08,49276.25,1758.4999999999998,"The order for 200 sheets of Colored Paper (Cardstock) was successfully processed and will be delivered by April 12, 2025. However, the order for 500 sheets of Standard Copy Paper could not be completed due to insufficient stock. Additional sourcing or restock for Standard Copy Paper is needed."
+10,2025-04-08,49301.25,1753.4999999999998,"The order for 500 sheets of Glossy paper and 300 sheets of Heavy cardstock could not be fulfilled due to insufficient stock. However, both items will be restocked by April 12, 2025, and once they arrive, we can place the order for delivery by April 15, 2025. The total quote for the items is $147.00, with applicable discounts already applied."
+11,2025-04-08,49301.25,1753.4999999999998,"The requested items, 500 sheets of A3 glossy paper and 300 sheets of A4 matte paper, are not available in the inventory. A3 glossy paper does not exist in the inventory while A4 matte paper is also not listed. Consider alternate options such as 'A4 paper' or 'Matte paper' if a matte finish is still desired, as they may serve similar purposes."
+14,2025-04-09,49201.65,1952.6999999999998,"The order for 5,000 sheets of A4 paper and 500 sheets of cardstock was processed successfully, with delivery expected by April 15, 2025. However, the required order for 2,000 sheets of poster paper was unsuccessful due to insufficient stock. A reorder for poster paper will be necessary."
+15,2025-04-12,48736.05,2883.9000000000005,"The orders for 10,000 sheets of A4 paper and 5,000 sheets of A3 colored paper could not be processed due to insufficient stock. However, both items have been restocked and are scheduled for delivery on April 19, 2025."
+16,2025-04-13,48867.95000000001,2928.9,"The order for 100 sheets of Poster board has been successfully processed, but the order for 500 sheets of A4 paper is on hold due to insufficient stock. The A4 paper is expected to be restocked by April 17, 2025. A total sales amount of $12.50 has been recorded for the processed order."
+17,2025-04-14,48767.95000000001,3128.9,"The order for the reception was partially successful. Here are the results:
+
+1. **A4 Paper**: 1000 sheets. Ordered successfully, to be delivered by 2025-04-18 at a total price of $25.00.
+2. **A3 Colored Paper**: 500 sheets. Ordered successfully, to be delivered by 2025-04-18 at a total price of $37.50.
+3. **Table Napkins**: Invalid item name; cannot process order.
+4. **Biodegradable Paper Cups**: Insufficient stock; cannot process order.
+5. **Biodegradable Paper Plates**: Insufficient stock; cannot process order.
+
+Therefore, total successful sales amount is $62.50 with only A4 and A3 colored paper being successfully ordered. The total remaining items needed to restock are unavailable at this time."
+18,2025-04-14,49075.950000000004,2888.9,"The order for the upcoming ceremony has been successfully processed. It includes:
+- 500 sheets of Heavy cardstock at a total of $135.00
+- 200 sheets of Colored paper at a total of $19.00
+
+Total cost: $154.00
+
+The request to restock 1000 sheets of Standard copy paper could not be completed due to the price not being specified, but it is expected to be available by April 18, 2025."
+19,2025-04-15,49775.950000000004,2698.8999999999996,"The order process has been completed as follows:
+
+- **Processed Order for Cardstock:**
+  - Quantity: 1000 sheets of cardstock in assorted colors
+  - Total Price: $500
+  - Estimated Delivery Date: April 19, 2025
+
+- **Restocking Needed:**
+  - **A4 Glossy Paper:**
+    - Current Stock: 0
+    - Minimum Required: 100
+    - Suggested Restock Quantity: 200
+  - **A3 Matte Paper:**
+    - Current Stock: 0
+    - Minimum Required: 100
+    - Suggested Restock Quantity: 200
+
+Both A4 glossy paper and A3 matte paper are below the minimum required stock levels and need to be restocked."
+20,2025-04-17,49969.700000000004,2661.3999999999996,"The order for the upcoming concert consisted of 5,000 flyers, 2,000 posters, and 10,000 tickets. However, the following outcomes occurred:
+
+1. **Flyers**: There was insufficient stock to fulfill the order; attempts to restock were unsuccessful, leaving the stock level at 0. 
+
+2. **Posters**: The order could not be fulfilled because posters are listed as unavailable and marked with an 'invalid item name'. 
+
+3. **Tickets**: The order for 10,000 tickets printed on A4 paper was processed successfully at a total cost of $425.00.
+
+In summary, the tickets are confirmed for processing, but flyers and posters remain unfulfilled. Consider alternative suppliers for these items."

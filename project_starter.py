@@ -229,6 +229,12 @@ paper_supplies = [
     {"item_name": "80 lb text paper",                 "category": "specialty",    "unit_price": 0.40},
     {"item_name": "250 gsm cardstock",                "category": "specialty",    "unit_price": 0.30},
     {"item_name": "220 gsm poster paper",             "category": "specialty",    "unit_price": 0.35},
+    {"item_name": "Poster board",                     "category": "paper",        "unit_price": 0.30},
+    {"item_name": "Adhesive tape",                    "category": "product",      "unit_price": 0.15},  # per roll
+    {"item_name": "Decorative masking tape",          "category": "product",      "unit_price": 0.18},  # per roll
+    {"item_name": "Biodegradable packaging tape",     "category": "product",      "unit_price": 0.25},  # per roll
+    {"item_name": "A3 drawing paper",                 "category": "paper",        "unit_price": 0.15},
+    {"item_name": "Balloons",                         "category": "product",      "unit_price": 0.10},  # per balloon
 ]
 
 # Given below are some utility functions you can use to implement your multi-agent system
