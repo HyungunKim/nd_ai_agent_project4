@@ -61,6 +61,13 @@ def test_get_available_paper_supplies():
     assert "A4 paper" in result
     assert "A4 glossy paper" in result
     assert "Cardstock" in result
+    # Check for newly added items
+    assert "Poster board" in result
+    assert "Adhesive tape" in result
+    assert "Decorative masking tape" in result
+    assert "Biodegradable packaging tape" in result
+    assert "A3 drawing paper" in result
+    assert "Balloons" in result
 
 def test_calculate_bulk_discount():
     """Test the calculate_bulk_discount tool directly."""

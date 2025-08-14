@@ -65,6 +65,13 @@ def test_get_available_paper_supplies():
     assert "A4 paper" in result
     assert "A4 glossy paper" in result
     assert "Cardstock" in result
+    # Check for newly added items
+    assert "Poster board" in result
+    assert "Adhesive tape" in result
+    assert "Decorative masking tape" in result
+    assert "Biodegradable packaging tape" in result
+    assert "A3 drawing paper" in result
+    assert "Balloons" in result
 
 def test_parse_request():
     """Test the parse_request tool directly."""
@@ -78,14 +85,15 @@ def test_parse_request():
 
 def test_orchestrator_quote_request(orchestrator):
     """Test the orchestrator's ability to handle a quote request."""
-    query = "I need a quote for 100 colored paper for delivery on September 15, 2025. (Date of request: 2025-08-01)"
+    init_database()
+    query = "I need a quote for 100 a4 glossy paper for delivery on September 15, 2025. (Date of request: 2025-08-01)"
     response = orchestrator.run(query)
 
     # Verify the response contains relevant information
     assert response is not None
     assert isinstance(response, str)
     # The response should mention Copy Paper
-    assert "A4 paper" in response
+    assert "A4 glossy paper" in response
     # The response should include pricing information
     assert "$" in response or "price" in response.lower() or "cost" in response.lower()
 

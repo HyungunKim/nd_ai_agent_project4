@@ -61,6 +61,13 @@ def test_get_available_paper_supplies():
     assert "A4 paper" in result
     assert "A4 glossy paper" in result
     assert "Cardstock" in result
+    # Check for newly added items
+    assert "Poster board" in result
+    assert "Adhesive tape" in result
+    assert "Decorative masking tape" in result
+    assert "Biodegradable packaging tape" in result
+    assert "A3 drawing paper" in result
+    assert "Balloons" in result
 
 def test_get_supplier_delivery_date():
     """Test the get_supplier_delivery_date tool directly."""
@@ -73,8 +80,9 @@ def test_get_supplier_delivery_date():
 def test_process_order():
     """Test the process_order tool directly."""
     # Create a simple order with one item
-    items = [OrderItem(item_name="A4 paper", quantity=10, price=0.5)]
-    result = process_order(items, "2025-08-01")
+    init_database()
+    items = [OrderItem(item_name="A4 glossy paper", quantity=10, price=0.5)]
+    result = process_order(items, "2025-08-01", "2025-08-10")
     print()
     print(result)
     assert isinstance(result, Order)
@@ -84,7 +92,7 @@ def test_process_order():
 
     # Test with an item that doesn't exist in paper_supplies
     items = [OrderItem(item_name="Nonexistent Item", quantity=10, price=0.5)]
-    result = process_order(items, "2025-08-01")
+    result = process_order(items, "2025-08-01", "2025-08-10")
     print()
     print(result)
     assert isinstance(result, Order)
@@ -96,7 +104,7 @@ def test_check_order_status():
     # First create an order to get an order ID
     init_database()
     items = [OrderItem(item_name="A4 paper", quantity=100, price=5.0)]
-    order = process_order(items, "2025-08-01")
+    order = process_order(items, "2025-08-01", "2025-08-10")
     # Get the transaction ID from the first order result
     if order.order_results and len(order.order_results) > 0:
         transaction_id = order.order_results[0].transaction_id
@@ -124,7 +132,7 @@ def test_order_agent_check_status(order_agent):
     """Test the order agent's ability to check an order status."""
     # First create an order to get an order ID
     items = [OrderItem(item_name="A4 paper", quantity=10)]
-    order = process_order(items, "2025-08-01")
+    order = process_order(items, "2025-08-01", "2025-08-10")
     print(order)
     # Get the transaction ID from the first order result
     if order.order_results and len(order.order_results) > 0:
