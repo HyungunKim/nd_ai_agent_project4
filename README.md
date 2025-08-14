@@ -480,3 +480,41 @@ The process is as follows:
 5.  **Results Output**: The final response for each test scenario, along with the cash balance and inventory value at that point in time, is saved to `test_results.csv`. This file provides a summary of the system's performance across the test cases.
 
 This implementation provides a robust framework for automating business processes, with clear logging and result tracking for evaluation and debugging.
+
+## Analysis and Reflection
+
+Based on the test results from `saved_outputs/full_output4/test_results.csv`, the multi-agent system demonstrates a strong ability to handle quote requests, with clear successes, partial successes, and failures that provide insight into the system's capabilities and limitations.
+
+### Successes
+
+The agent successfully fulfilled several quotes, demonstrating its ability to understand the user's request, check inventory, and provide a quote. Here are three examples of successful quote fulfillments:
+
+-  **Quote 1:** The request for "200 sheets of A4 glossy paper, 100 sheets of heavy cardstock, and 100 sheets of colored paper" was successfully fulfilled with a quote of $70.
+``` 
+(line 433~ from project_output.txt)
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Calling tool: 'process_order' with arguments: {'order_date': '2025-04-01', 'order_due_date': '2025-04-15', 'items': [{'item_name': 'A4 glossy paper', 'quantity': 200, 'price': 30}, {'item_name': 'Heavy cardstock', 'quantity': 100, 'price': 20}, {'item_name': 'Colored paper', 'quantity': 100, 'price':    │
+│ 20}]}                                                                                                                                                                                                                                                                                                            │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+FUNC (get_supplier_delivery_date): Calculating for qty 200 from date string '2025-04-01'
+Observations: order_date='2025-04-01' order_results=|OrderResult(item_name='a4 glossy paper', quantity=200, price=30.0, status='Processed', transaction_id=69), OrderResult(item_name='heavy cardstock', quantity=100, price=20.0, status='Processed', transaction_id=66), OrderResult(item_name='colored paper', 
+quantity=100, price=20.0, status='Processed', transaction_id=67)] total_sales_amount=40.0 restock_results=|RestockResult(item_name='a4 glossy paper', quantity=200, price=22.0, status='Restocked', delivery_date='2025-04-05', transaction_id=69)] all_items_processed=True
+[Step 3: Duration 3.14 seconds| Input tokens: 6,501 | Output tokens: 190]
+```
+The agent identified exact item name, checked the inventory, made quote and ordered the requested items. 
+RestockResult shows that restock of `A4 glossy paper` happened during the ordering process but it arrived before requested due date.
+
+### Failures
+
+The failures highlight areas for future improvement, primarily in inventory management and user communication.
+
+- **Quote 3:** The orchestrator agent kept going in circles and did not provide valid quote or order.
+- - This may be because orchestrator gets confused as it has to remember so many things until it returns it's final answer.
+-  Also unnecessary restocks happened often (project_output line 738). 
+-  This may be that the inventory agent is not provided with right prompt and tools. 
+
+### Future work
+Our orchestrator have to remember so many things. We can help it by reducing the managed sub agents.
+The inventory management can be managed as a sub agent to order agent. This is because the order agent needs the information directly, and restocking inventory policy can be handled in more integrated way.
+Another possible solution to reducing the burden to the orchestrator agent is to split it into two agents, namely planning agent and routing agent.  
+The planning agent can come up with high level planning. And the routing agent can route the task and summarize the result of the sub agent.
