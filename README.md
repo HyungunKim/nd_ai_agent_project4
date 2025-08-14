@@ -211,7 +211,102 @@ graph TD
         Prompt("What is our current cash balance as of 2025-08-15?")
     end
 ```
+## Put it all together!
+If we put all the agents and their tools together, our system looks like the diagram below.
+```mermaid
+graph TD
+    subgraph Customer
+        direction LR
+        CustomerRequest[Customer Request]
+    end
 
+    subgraph Multi-Agent System
+        direction TB
+        Orchestrator[Orchestrator Agent]
+
+        subgraph Specialized Agents
+            direction LR
+            Inventory[Inventory Agent]
+            Quote[Quote Agent]
+            Order[Order Fulfillment Agent]
+            Financial[Financial Agent]
+        end
+
+        %% Connections
+        CustomerRequest --> Orchestrator
+
+        Orchestrator --> Inventory
+        Orchestrator --> Quote
+        Orchestrator --> Order
+        Orchestrator --> Financial
+
+        Inventory --> Orchestrator
+        Quote --> Orchestrator
+        Order --> Orchestrator
+        Financial --> Orchestrator
+    end
+
+    subgraph Tools
+        direction TB
+        %% Orchestrator Tools
+        subgraph Orchestrator Tools
+            ParseRequest[parse_request]
+        end
+
+        %% Inventory Tools
+        subgraph Inventory Tools
+            CheckInventoryStatus[check_inventory_status]
+            GetInventoryReport[get_inventory_report]
+            RestockInventory[restock_inventory]
+        end
+
+        %% Quote Tools
+        subgraph Quote Tools
+            SearchQuoteHistory[search_quote_history]
+            CalculateBulkDiscount[calculate_bulk_discount]
+        end
+
+        %% Order Tools
+        subgraph Order Tools
+            ProcessOrder[process_order]
+            GetSupplierDeliveryDate[get_supplier_delivery_date]
+        end
+
+        %% Financial Tools
+        subgraph Financial Tools
+            GetFinancialStatus[get_financial_status]
+            GetCashBalance[get_cash_balance]
+        end
+
+        %% Common Tool
+        subgraph Common Tool
+            GetAvailablePaperSupplies[get_available_paper_supplies]
+        end
+    end
+
+    %% Tool Connections
+    Orchestrator -- "Uses" --> ParseRequest
+    Orchestrator -- "Uses" --> GetAvailablePaperSupplies
+
+    Inventory -- "Uses" --> CheckInventoryStatus
+    Inventory -- "Uses" --> GetInventoryReport
+    Inventory -- "Uses" --> RestockInventory
+    Inventory -- "Uses" --> GetAvailablePaperSupplies
+
+    Quote -- "Uses" --> SearchQuoteHistory
+    Quote -- "Uses" --> CalculateBulkDiscount
+    Quote -- "Uses" --> GetAvailablePaperSupplies
+
+    Order -- "Uses" --> ProcessOrder
+    Order -- "Uses" --> GetSupplierDeliveryDate
+    Order -- "Uses" --> GetAvailablePaperSupplies
+
+    Financial -- "Uses" --> GetFinancialStatus
+    Financial -- "Uses" --> GetCashBalance
+    Financial -- "Uses" --> GetAvailablePaperSupplies
+
+    
+```
 ## Instruction Prompting
 
 
