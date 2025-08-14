@@ -168,6 +168,7 @@ paper_supplies = [
     {"item_name": "A4 paper",                         "category": "paper",        "unit_price": 0.05},
     {"item_name": "Letter-sized paper",              "category": "paper",        "unit_price": 0.06},
     {"item_name": "Cardstock",                        "category": "paper",        "unit_price": 0.15},
+    {"item_name": "Heavy cardstock",                "category": "paper",        "unit_price": 0.20},
     {"item_name": "Colored paper",                    "category": "paper",        "unit_price": 0.10},
     {"item_name": "Glossy paper",                     "category": "paper",        "unit_price": 0.20},
     {"item_name": "Matte paper",                      "category": "paper",        "unit_price": 0.18},
@@ -190,10 +191,21 @@ paper_supplies = [
     {"item_name": "Standard copy paper",              "category": "paper",        "unit_price": 0.04},
     {"item_name": "Bright-colored paper",             "category": "paper",        "unit_price": 0.12},
     {"item_name": "Patterned paper",                  "category": "paper",        "unit_price": 0.15},
+    {"item_name": "A4 glossy paper",                  "category": "paper",        "unit_price": 0.22},
+    {"item_name": "A3 paper",                         "category": "paper",        "unit_price": 0.12},
+    {"item_name": "A3 matte paper",                   "category": "paper",        "unit_price": 0.20},
+    {"item_name": "A3 colored paper",                 "category": "paper",        "unit_price": 0.15},
+    {"item_name": "A5 paper",                         "category": "paper",        "unit_price": 0.04},
+    {"item_name": "A5 uncoated paper",                "category": "paper",        "unit_price": 0.05},
+    {"item_name": "A5 recycled paper",                "category": "paper",        "unit_price": 0.06},
+    {"item_name": "24 lb bond paper",                 "category": "paper",        "unit_price": 0.08},
+    {"item_name": "Biodegradable banner paper",       "category": "paper",        "unit_price": 0.35},
 
     # Product Types (priced per unit)
     {"item_name": "Paper plates",                     "category": "product",      "unit_price": 0.10},  # per plate
+    {"item_name": "Biodegradable paper plates",        "category": "product",      "unit_price": 0.15},  # per plate
     {"item_name": "Paper cups",                       "category": "product",      "unit_price": 0.08},  # per cup
+    {"item_name": "Biodegradable paper cups",          "category": "product",      "unit_price": 0.12},  # per cup
     {"item_name": "Paper napkins",                    "category": "product",      "unit_price": 0.02},  # per napkin
     {"item_name": "Disposable cups",                  "category": "product",      "unit_price": 0.10},  # per cup
     {"item_name": "Table covers",                     "category": "product",      "unit_price": 1.50},  # per cover
@@ -1579,7 +1591,7 @@ orchestrator = ToolCallingAgent(model=model,
                                       "When querying to other agents please provide the (Date of request) in the request text."
                                      "Also a boiler plate input of 'additional_args': {} is required to call other agents."
                                      "For example: "
-                     "{'task': '(Date of request: 2025-08-01) I want to check the inventory status of A4 paper.', 'additional_args': {}}",
+                                     "{'task': '(Date of request: 2025-08-01) I want to check the inventory status of A4 paper.', 'additional_args': {}}",
                          managed_agents=[inventory_agent, quote_agent, order_agent, financial_agent],
                          max_tool_threads=1)
 
@@ -1637,7 +1649,7 @@ def run_test_scenarios():
         request_with_date = f"{row['request']} (Date of request: {request_date})"
 
         # Use our orchestrator agent to handle the request
-        response = orchestrator.run(request_with_date, max_steps=5, reset=True)
+        response = orchestrator.run(request_with_date, reset=True)
 
         # Update state
         report = generate_financial_report(request_date)
