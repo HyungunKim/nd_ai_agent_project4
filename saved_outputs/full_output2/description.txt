@@ -1,0 +1,3 @@
+Second try
+Better handling of item names.
+Thanks to agents having name checking tools.
