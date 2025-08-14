@@ -7,6 +7,7 @@ from project_starter import (
     # generate_quote,
     calculate_bulk_discount,
     search_quote_history,
+    get_available_paper_supplies,
     init_database,
     ToolCallingAgent,
     OpenAIServerModel
@@ -33,11 +34,16 @@ def quote_agent():
     # Initialize the quote agent
     agent = ToolCallingAgent(
         model=model,
-        tools=[search_quote_history, calculate_bulk_discount],
+        tools=[search_quote_history, calculate_bulk_discount, get_available_paper_supplies],
         name="QuoteAgent",
         instructions="""
         You are a helpful agent. You will get quote request from client. You can search quote history to find appropriate discount.
         If no quote history is found, you can calculate bulk discount and generate quote.
+        When searching for similar quotes or calculating bulk discount, drop the plurals. For example, 'A4 paper' instead of 'A4 papers'.
+        Always use the exact item names from the paper_supplies list. You can use the get_available_paper_supplies tool 
+        to get a list of all available paper supply item names. This ensures that the correct items are identified and processed.
+        For example, 'Glossy paper' instead of 'glossy paper'. 
+        Use this format for input of tools and output of your responses
         """,
         description="""
         The agent for generating quotes. It has access to tools such as generate_quote, calculate_bulk_discount, search_quote_history.
@@ -45,6 +51,16 @@ def quote_agent():
     )
 
     return agent
+
+def test_get_available_paper_supplies():
+    """Test the get_available_paper_supplies tool directly."""
+    result = get_available_paper_supplies()
+    assert isinstance(result, list)
+    assert len(result) > 0
+    # Check for some specific paper items that should be in the list
+    assert "A4 paper" in result
+    assert "A4 glossy paper" in result
+    assert "Cardstock" in result
 
 def test_calculate_bulk_discount():
     """Test the calculate_bulk_discount tool directly."""
@@ -56,11 +72,12 @@ def test_calculate_bulk_discount():
     assert hasattr(result, 'discount_percentage')
     assert hasattr(result, 'total_price')
 
-    # Test with an item that doesn't exist
+    # Test with an item that doesn't exist in paper_supplies
     result = calculate_bulk_discount("Nonexistent Item", 100)
     print(result)
     assert isinstance(result, BulkDiscountInfo)
     assert result.error is not None
+    assert "Invalid item name" in result.error
 
 def test_search_quote_history():
     """Test the search_quote_history tool directly."""
@@ -109,5 +126,16 @@ def test_quote_agent_calculate_discount(quote_agent):
     assert "discount" in response.lower()
     # The response should include percentage or amount
     assert "%" in response or "$" in response
+
+def test_quote_agent_exact_item_names(quote_agent):
+    """Test the quote agent's ability to use exact item names from paper_supplies."""
+    query = "I need a quote for 100 sheets of glossy paper for delivery on September 15, 2025."
+    response = quote_agent.run(query)
+
+    # Verify the response contains the exact item name from paper_supplies
+    assert response is not None
+    assert isinstance(response, str)
+    # The response should use the exact item name "Glossy paper" instead of just "glossy paper"
+    assert "Glossy paper" in response
 
 # pytest will automatically discover and run the tests

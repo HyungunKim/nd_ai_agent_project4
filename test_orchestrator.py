@@ -3,6 +3,7 @@ import os
 import dotenv
 from project_starter import (
     parse_request,
+    get_available_paper_supplies,
     init_database,
     ToolCallingAgent,
     OpenAIServerModel,
@@ -32,21 +33,38 @@ def orchestrator():
 
     # Initialize the orchestrator agent
     agent = ToolCallingAgent(model=model,
-                         tools=[parse_request],
+                         tools=[parse_request, get_available_paper_supplies],
                          instructions="You are a helpful agent. You will get quote request from client. "
                                       "You have to check inventory status, check previous quote history "
                                       "to find appropriate discount, generate quote, process order, "
                                       "There are other agents that can help you."
                                       "Think step by step. Call one necessary tools or agents for that step."
                                       "When querying to other agents please provide the (Date of request) in the request text."
-                                     "Also a boiler plate input of 'additional_args': {} is required to call other agents."
-                                     "For example: "
+                                      "Convert user request items to exact item names from paper_supplies list."
+                                      "That is if user request is '100 copy paper' then convert it to 'Standard copy paper' which is in paper_supplies."
+                                      "Always use the exact item names from the paper_supplies list. You can use the get_available_paper_supplies tool "
+                                      "to get a list of all available paper supply item names. This ensures that the correct items are identified and processed."
+                                      "For example, 'Glossy paper' instead of 'glossy paper'. "
+                                      "Use this format for input of tools and output of your responses"
+                                      "Also a boiler plate input of 'additional_args': {} is required to call other agents."
+                                      "For example: "
                      "{'task': '(Date of request: 2025-08-01) I want to check the inventory status of A4 paper.', 'additional_args': {}}",
                          managed_agents=[inventory_agent, quote_agent, order_agent, financial_agent],
                          max_tool_threads=1)
 
 
     return agent
+
+def test_get_available_paper_supplies():
+    """Test the get_available_paper_supplies tool directly."""
+    result = get_available_paper_supplies()
+    print(result)
+    assert isinstance(result, list)
+    assert len(result) > 0
+    # Check for some specific paper items that should be in the list
+    assert "A4 paper" in result
+    assert "A4 glossy paper" in result
+    assert "Cardstock" in result
 
 def test_parse_request():
     """Test the parse_request tool directly."""
@@ -60,7 +78,7 @@ def test_parse_request():
 
 def test_orchestrator_quote_request(orchestrator):
     """Test the orchestrator's ability to handle a quote request."""
-    query = "I need a quote for 100 A4 paper for delivery on September 15, 2025. (Date of request: 2025-08-01)"
+    query = "I need a quote for 100 colored paper for delivery on September 15, 2025. (Date of request: 2025-08-01)"
     response = orchestrator.run(query)
 
     # Verify the response contains relevant information
@@ -107,5 +125,25 @@ def test_orchestrator_financial_request(orchestrator):
     assert isinstance(response, str)
     # The response should mention financial terms
     assert any(term in response.lower() for term in ["financial", "cash", "balance", "asset", "liability"])
+
+def test_orchestrator_exact_item_names(orchestrator):
+    """Test the orchestrator's ability to use exact item names from paper_supplies."""
+    query = "I need a quote for 100 sheets of glossy paper for delivery on September 15, 2025. (Date of request: 2025-08-01)"
+    response = orchestrator.run(query)
+
+    # Verify the response contains the exact item name from paper_supplies
+    assert response is not None
+    assert isinstance(response, str)
+    # The response should use the exact item name "Glossy paper" instead of just "glossy paper"
+    assert "Glossy paper" in response
+
+    query = "I need a quote for 100 sheets of bright color papers for delivery on September 15, 2025. (Date of request: 2025-08-01)"
+    response = orchestrator.run(query)
+
+    # Verify the response contains the exact item name from paper_supplies
+    assert response is not None
+    assert isinstance(response, str)
+    # The response should use the exact item name "Glossy paper" instead of just "glossy paper"
+    assert "Bright-colored paper" in response
 
 # pytest will automatically discover and run the tests

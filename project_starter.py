@@ -278,7 +278,7 @@ def generate_sample_inventory(paper_supplies: list, coverage: float = 0.4, seed:
     inventory = []
     for item in selected_items:
         inventory.append({
-            "item_name": item["item_name"],
+            "item_name": item["item_name"].lower(),
             "category": item["category"],
             "unit_price": item["unit_price"],
             "current_stock": np.random.randint(200, 800),  # Realistic stock range
@@ -395,7 +395,7 @@ def init_database(db_engine: Engine = db_engine, seed: int = 137) -> Engine:
         # Add one stock order transaction per inventory item
         for _, item in inventory_df.iterrows():
             initial_transactions.append({
-                "item_name": item["item_name"],
+                "item_name": item["item_name"].lower(),
                 "transaction_type": "stock_orders",
                 "units": item["current_stock"],
                 "price": item["current_stock"] * item["unit_price"] / DEFUALT_MARKUP,
@@ -440,6 +440,7 @@ def create_transaction(
         Exception: For other database or execution errors.
     """
     try:
+        item_name = item_name.lower()
         # Convert datetime to ISO string if necessary
         date_str = date.isoformat() if isinstance(date, datetime) else date
 
@@ -518,6 +519,7 @@ def get_stock_level(item_name: str, as_of_date: Union[str, datetime]) -> pd.Data
     Returns:
         pd.DataFrame: A single-row DataFrame with columns 'item_name' and 'current_stock'.
     """
+    item_name = item_name.lower()
     # Convert date to ISO string format if it's a datetime object
     if isinstance(as_of_date, datetime):
         as_of_date = as_of_date.isoformat()
@@ -793,6 +795,20 @@ def check_inventory_status(item_name: str, quantity: int, as_of_date: str) -> In
     Returns:
         InventoryStatus: A Pydantic model containing inventory status information
     """
+    item_name = item_name.lower()
+    # Validate that item_name is in paper_supplies
+    valid_item_names = [item["item_name"].lower() for item in paper_supplies]
+    if item_name not in valid_item_names:
+        return InventoryStatus(
+            item_name=item_name,
+            available=False,
+            requested_quantity=quantity,
+            current_stock=0,
+            status=f"Invalid item name: {item_name} is not in paper_supplies list",
+            needs_restock=False,
+            restock_quantity=0
+        )
+
     # Get current stock level
     stock_info = get_stock_level(item_name, as_of_date)
 
@@ -871,7 +887,7 @@ def restock_inventory(as_of_date: str, buffer_multiplier: float = 1.5) -> Restoc
     total_restock_cost = 0.0
 
     for item in items_to_restock:
-        item_name = item.item_name
+        item_name = item.item_name.lower()
         min_stock_level = item.min_stock_level
         current_stock = item.current_stock
 
@@ -955,7 +971,7 @@ def get_inventory_report(as_of_date: str) -> InventoryReport:
     inventory_value = 0
 
     for _, item in inventory_df.iterrows():
-        item_name = item["item_name"]
+        item_name = item["item_name"].lower()
         min_stock_level = item["min_stock_level"]
         unit_price = item["unit_price"]
         category = item["category"]
@@ -1010,6 +1026,20 @@ def calculate_bulk_discount(item_name: str, quantity: int) -> BulkDiscountInfo:
     Returns:
         BulkDiscountInfo: A Pydantic model containing discount information
     """
+    # Validate that item_name is in paper_supplies
+    item_name = item_name.lower()
+    valid_item_names = [item["item_name"].lower() for item in paper_supplies]
+    if item_name not in valid_item_names:
+        return BulkDiscountInfo(
+            item_name=item_name,
+            quantity=quantity,
+            unit_price=0,
+            discount_percentage=0,
+            discounted_unit_price=0,
+            total_price=0,
+            error=f"Invalid item name: {item_name} is not in paper_supplies list"
+        )
+
     # Get the base unit price for the item
     inventory_query = f"SELECT unit_price FROM inventory WHERE item_name = '{item_name}'"
     price_result = pd.read_sql(inventory_query, db_engine)
@@ -1017,7 +1047,7 @@ def calculate_bulk_discount(item_name: str, quantity: int) -> BulkDiscountInfo:
     if price_result.empty:
         # Try to find in paper_supplies if not in inventory
         for item in paper_supplies:
-            if item["item_name"] == item_name:
+            if item["item_name"].lower() == item_name:
                 unit_price = item["unit_price"]
                 break
         else:
@@ -1028,7 +1058,7 @@ def calculate_bulk_discount(item_name: str, quantity: int) -> BulkDiscountInfo:
                 discount_percentage=0,
                 discounted_unit_price=0,
                 total_price=0,
-                error="Item not found"
+                error="Item not found in inventory or paper_supplies"
             )
     else:
         unit_price = price_result["unit_price"].iloc[0]
@@ -1073,7 +1103,7 @@ def format_quote_explanation(items: List[Dict], total_amount: float, delivery_da
 
     # Add details for each item
     for item in items:
-        item_name = item["item_name"]
+        item_name = item["item_name"].lower()
         quantity = item["quantity"]
         unit_price = item["unit_price"]
         discount_percentage = item["discount_percentage"]
@@ -1202,17 +1232,29 @@ def process_order(items: List[Union[OrderItem]], order_date: str) -> Order:
     for item in items:
         # Handle both Dict and OrderItem inputs
         if isinstance(item, OrderItem):
-            item_name = item.item_name
+            item_name = item.item_name.lower()
             quantity = item.quantity
             # price_per_unit = item.price_per_unit or 0
             price = item.price or 0#price_per_unit * quantity
             assert price > 0, "Price must be greater than zero."
         else:
-            item_name = item["item_name"]
+            item_name = item["item_name"].lower()
             quantity = item["quantity"]
             # price_per_unit = item.get("price_per_unit", 0)
             price = item.get("price", 0)#price_per_unit * quantity)
             assert price > 0, "Price must be greater than zero."
+
+        # Validate that item_name is in paper_supplies
+        valid_item_names = [item["item_name"].lower() for item in paper_supplies]
+        if item_name not in valid_item_names:
+            order_results.append(OrderResult(
+                item_name=item_name,
+                quantity=quantity,
+                price=price,
+                status=f"Invalid item name: {item_name} is not in paper_supplies list",
+                transaction_id=None
+            ))
+            continue
 
         # Check inventory status
         inventory_status = check_inventory_status(item_name, quantity, order_date)
@@ -1484,7 +1526,17 @@ def get_financial_status(as_of_date: str) -> FinancialStatus:
         inventory_summary=financial_report["inventory_summary"]
     )
 
-# tool for orchestrator agent
+# tools for orchestrator agent
+@tool
+def get_available_paper_supplies() -> List[str]:
+    """
+    Get a list of all available paper supply item names.
+
+    Returns:
+        List[str]: A list of all available paper supply item names
+    """
+    return [item["item_name"] for item in paper_supplies]
+
 @tool
 def parse_request(request: str) -> RequestInfo:
     """
@@ -1546,28 +1598,40 @@ class FinancialAgent(ToolCallingAgent):
 
 # Initialize the agents
 inventory_agent = ToolCallingAgent(model=model,
-                         tools=[check_inventory_status, get_inventory_report, restock_inventory],
+                         tools=[check_inventory_status, get_inventory_report, restock_inventory, get_available_paper_supplies],
                          name="InventoryAgent",
+                         instructions="Always use the exact item names from the paper_supplies list. You can use the get_available_paper_supplies tool "
+                                      "to get a list of all available paper supply item names. This ensures that the correct items are identified and processed."
+                                      "For example, 'Glossy paper' instead of 'glossy paper'. "
+                                      "Use this format for input of tools and output of your responses",
                          description="""
                          The agent for handling inventory logic. It has access to tools such as check_inventory_status, get_inventory_report, and restock_inventory.
                          """, max_tool_threads=1)
 
 quote_agent = ToolCallingAgent(model=model,
-                         tools=[search_quote_history, calculate_bulk_discount],
+                         tools=[search_quote_history, calculate_bulk_discount, get_available_paper_supplies],
                          name="QuoteAgent",
-                         instructions="when searching for similar quotes or calculateing bulk discount, drop the plurals. For example, 'A4 paper' instead of 'A4 papers'.",
+                         instructions="When searching for similar quotes or calculating bulk discount, drop the plurals. For example, 'A4 paper' instead of 'A4 papers'. "
+                                      "Always use the exact item names from the paper_supplies list. You can use the get_available_paper_supplies tool "
+                                      "to get a list of all available paper supply item names. This ensures that the correct items are identified and processed."
+                                      "For example, 'Glossy paper' instead of 'glossy paper'. "
+                                      "Use this format for input of tools and output of your responses",
                          description="""
                          The agent for generating quotes. It has access to tools `search_quote_history` to find past quotes. Apply bulk discount where there was similar preceding quote history to be fair.
                          Warning! This agent does not have access to current inventory status. Please check the inventory before making a quote.[OrderItem(item_name="A4 paper", quantity=123)]
                          """,
                                max_tool_threads=1)
 order_agent = ToolCallingAgent(model=model,
-                         tools=[process_order, get_supplier_delivery_date],
+                         tools=[process_order, get_supplier_delivery_date, get_available_paper_supplies],
                          name="OrderAgent",
                          instructions="""
-                                 you are a helpful agent. you will get order request from client. you can process order, check order status, get supplier delivery date.
-                                 when using 'process_order' tool look at this example to provide arguments arguments: {'order_date': '2025-08-01', 'items': [{'item_name': 'A4 paper', 'quantity': 20, 'price': 1}]
-                                 here the 'price' is total price for that item and quantity.
+                                 You are a helpful agent. You will get order request from client. You can process order, check order status, get supplier delivery date.
+                                 When using 'process_order' tool look at this example to provide arguments arguments: {'order_date': '2025-08-01', 'items': [{'item_name': 'A4 paper', 'quantity': 20, 'price': 1}]
+                                 Here the 'price' is total price for that item and quantity.
+                                 Always use the exact item names from the paper_supplies list. You can use the get_available_paper_supplies tool 
+                                 to get a list of all available paper supply item names. This ensures that the correct items are identified and processed.
+                                 For example, 'Glossy paper' instead of 'glossy paper'. 
+                                 Use this format for input of tools and output of your responses
                                  """,
                          description="""
                          The agent for processing orders. It has access to tools such as `process_order`, `get_supplier_delivery_date`.
@@ -1575,23 +1639,34 @@ order_agent = ToolCallingAgent(model=model,
                          """,
                                max_tool_threads=1)
 financial_agent = ToolCallingAgent(model=model,
-                         tools=[get_financial_status, get_cash_balance],
+                         tools=[get_financial_status, get_cash_balance, get_available_paper_supplies],
                          name="FinancialAgent",
+                         instructions="Always use the exact item names from the paper_supplies list. You can use the get_available_paper_supplies tool "
+                                      "to get a list of all available paper supply item names. This ensures that the correct items are identified and processed."
+                                      "For example, 'Glossy paper' instead of 'glossy paper'. "
+                                      "Use this format for input of tools and output of your responses"
+                                   ,
                          description="""
                          The agent for generating financial reports. It has access to tools such as `get_financial_status`, `get_cash_balance`.
                          """,
                                    max_tool_threads=1)
 orchestrator = ToolCallingAgent(model=model,
-                         tools=[parse_request],
+                         tools=[parse_request, get_available_paper_supplies],
                          instructions="You are a helpful agent. You will get quote request from client. "
                                       "You have to check inventory status, check previous quote history "
                                       "to find appropriate discount, generate quote, process order, "
                                       "There are other agents that can help you."
                                       "Think step by step. Call one necessary tools or agents for that step."
                                       "When querying to other agents please provide the (Date of request) in the request text."
-                                     "Also a boiler plate input of 'additional_args': {} is required to call other agents."
-                                     "For example: "
-                                     "{'task': '(Date of request: 2025-08-01) I want to check the inventory status of A4 paper.', 'additional_args': {}}",
+                                      "Convert user request items to exact item names from paper_supplies list."
+                                      "That is if user request is '100 copy paper' then convert it to 'Standard copy paper' which is in paper_supplies."
+                                      "Always use the exact item names from the paper_supplies list. You can use the get_available_paper_supplies tool "
+                                      "to get a list of all available paper supply item names. This ensures that the correct items are identified and processed."
+                                      "For example, 'Glossy paper' instead of 'glossy paper'. "
+                                      "Use this format for input of tools and output of your responses"
+                                      "Also a boiler plate input of 'additional_args': {} is required to call other agents."
+                                      "For example: "
+                                      "{'task': '(Date of request: 2025-08-01) I want to check the inventory status of A4 paper.', 'additional_args': {}}",
                          managed_agents=[inventory_agent, quote_agent, order_agent, financial_agent],
                          max_tool_threads=1)
 
