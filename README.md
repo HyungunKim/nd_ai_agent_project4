@@ -85,25 +85,34 @@ This document outlines the design of a multi-agent system for Munder Difflin Pap
 
 ## Agent Tools and Functions
 
+### Common Tool for All Agents:
+- `get_available_paper_supplies()`: Returns a list of all available paper supply item names from the paper_supplies list
+
 ### Inventory Agent Tools:
+- `check_inventory_status(item_name, quantity, as_of_date)`: Check if the requested item is available in sufficient quantity
+- `get_inventory_report(as_of_date)`: Generate a comprehensive inventory report
+- `restock_inventory(as_of_date, buffer_multiplier)`: Restock items that are below their minimum stock levels
 - `get_all_inventory(as_of_date)`: Retrieve snapshot of available inventory
 - `get_stock_level(item_name, as_of_date)`: Check stock level for specific item
-- `check_restock_needs(item_name, quantity, as_of_date)`: Determine if restocking is needed
-- `restock_inventory(as_of_date, buffer_multiplier)`: Restock items that are below their minimum stock levels
 
 ### Quote Agent Tools:
 - `search_quote_history(search_terms, limit)`: Find similar historical quotes
 - `calculate_bulk_discount(item_name, quantity)`: Apply appropriate bulk discounts
-- `format_quote_explanation(items, quantities, prices, discounts)`: Create detailed quote explanation
+- `format_quote_explanation(items, total_amount, delivery_date)`: Create detailed quote explanation
 
 ### Order Fulfillment Agent Tools:
-- `create_transaction(item_name, transaction_type, quantity, price, date)`: Record transactions
+- `process_order(items, order_date)`: Process an order by creating sales transactions and arranging for restocking if needed
+- `check_order_status(order_id, as_of_date)`: Check the status of an order
 - `get_supplier_delivery_date(input_date_str, quantity)`: Calculate delivery dates
-- `process_order(items, quantities, prices, date)`: Handle complete order processing
+- `create_transaction(item_name, transaction_type, quantity, price, date)`: Record transactions
 
 ### Financial Agent Tools:
+- `get_financial_status(as_of_date)`: Get comprehensive financial status information
 - `get_cash_balance(as_of_date)`: Check current cash balance
 - `generate_financial_report(as_of_date)`: Create comprehensive financial report
+
+### Orchestrator Agent Tools:
+- `parse_request(request)`: Parse a customer request to extract key information
 
 ## System Flow Diagram
 
@@ -121,10 +130,22 @@ graph TD
     Order --> Orchestrator
     Financial --> Orchestrator
 
+    %% Common Tool for All Agents
+    Orchestrator --> GetAvailablePaperSupplies[get_available_paper_supplies]
+    Inventory --> GetAvailablePaperSupplies
+    Quote --> GetAvailablePaperSupplies
+    Order --> GetAvailablePaperSupplies
+    Financial --> GetAvailablePaperSupplies
+
+    %% Orchestrator Agent Tools
+    Orchestrator --> ParseRequest[parse_request]
+
     %% Inventory Agent Tools
+    Inventory --> CheckInventoryStatus[check_inventory_status]
+    Inventory --> GetInventoryReport[get_inventory_report]
+    Inventory --> RestockInventory[restock_inventory]
     Inventory --> GetAllInventory[get_all_inventory]
     Inventory --> GetStockLevel[get_stock_level]
-    Inventory --> CheckRestockNeeds[check_restock_needs]
 
     %% Quote Agent Tools
     Quote --> SearchQuoteHistory[search_quote_history]
@@ -132,17 +153,19 @@ graph TD
     Quote --> FormatQuoteExplanation[format_quote_explanation]
 
     %% Order Fulfillment Agent Tools
-    Order --> CreateTransaction[create_transaction]
-    Order --> GetSupplierDeliveryDate[get_supplier_delivery_date]
     Order --> ProcessOrder[process_order]
+    Order --> CheckOrderStatus[check_order_status]
+    Order --> GetSupplierDeliveryDate[get_supplier_delivery_date]
+    Order --> CreateTransaction[create_transaction]
 
     %% Financial Agent Tools
+    Financial --> GetFinancialStatus[get_financial_status]
     Financial --> GetCashBalance[get_cash_balance]
     Financial --> GenerateFinancialReport[generate_financial_report]
 
     %% Tool styles
     classDef tool fill:#f9f,stroke:#333,stroke-width:1px;
-    class GetAllInventory,GetStockLevel,CheckRestockNeeds,SearchQuoteHistory,CalculateBulkDiscount,FormatQuoteExplanation,CreateTransaction,GetSupplierDeliveryDate,ProcessOrder,GetCashBalance,GenerateFinancialReport tool;
+    class GetAvailablePaperSupplies,ParseRequest,CheckInventoryStatus,GetInventoryReport,RestockInventory,GetAllInventory,GetStockLevel,SearchQuoteHistory,CalculateBulkDiscount,FormatQuoteExplanation,ProcessOrder,CheckOrderStatus,GetSupplierDeliveryDate,CreateTransaction,GetFinancialStatus,GetCashBalance,GenerateFinancialReport tool;
 ```
 
 ## Implementation Considerations
