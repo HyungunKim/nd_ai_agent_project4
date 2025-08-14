@@ -8,255 +8,231 @@ This document outlines the design of a multi-agent system for Munder Difflin Pap
 ### 1. Orchestrator Agent
 **Role**: Central coordinator that receives customer requests, delegates tasks to specialized agents, and manages the overall workflow.
 **Responsibilities**:
-- Parse incoming customer requests
-- Extract key information (product types, quantities, delivery dates)
-- Delegate tasks to appropriate specialized agents
-- Collect responses from specialized agents
-- Formulate final responses to customers
-- Maintain conversation context
+- Parse incoming customer requests.
+- Extract key information (product types, quantities, delivery dates).
+- Delegate tasks to appropriate specialized agents.
+- Collect responses from specialized agents.
+- Formulate final responses to customers.
+- Maintain conversation context.
 
 ### 2. Inventory Agent
 **Role**: Manages inventory-related operations and provides stock information.
 **Responsibilities**:
-- Check current stock levels for requested items
-- Determine if restocking is needed based on minimum stock thresholds
-- Calculate delivery timelines for out-of-stock items
-- Provide inventory status reports to the Orchestrator
+- Check current stock levels for requested items.
+- Determine if restocking is needed based on minimum stock thresholds.
+- Generate comprehensive inventory reports.
+- Provide inventory status reports to the Orchestrator.
 
 ### 3. Quote Agent
 **Role**: Generates price quotes for customer requests based on inventory data and historical quotes.
 **Responsibilities**:
-- Calculate costs for requested items
-- Apply appropriate bulk discounts
-- Reference historical quotes for similar requests
-- Format quote explanations with clear breakdowns
-- Round totals to appealing numbers
-- Provide detailed quote information to the Orchestrator
+- Calculate costs for requested items.
+- Apply appropriate bulk discounts.
+- Reference historical quotes for similar requests.
+- Provide detailed quote information to the Orchestrator.
 
 ### 4. Order Fulfillment Agent
 **Role**: Processes approved orders and manages logistics.
 **Responsibilities**:
-- Create transactions for sales
-- Arrange for restocking when inventory is low
-- Calculate supplier delivery dates
-- Update inventory after transactions
-- Provide order status updates to the Orchestrator
+- Create transactions for sales.
+- Arrange for restocking when inventory is low.
+- Calculate supplier delivery dates.
+- Update inventory after transactions.
+- Provide order status updates to the Orchestrator.
 
 ### 5. Financial Agent
 **Role**: Monitors financial aspects of transactions and provides financial reporting.
 **Responsibilities**:
-- Track cash balance
-- Generate financial reports
-- Calculate inventory valuation
-- Identify top-selling products
-- Provide financial insights to the Orchestrator
+- Track cash balance.
+- Generate financial reports.
+- Identify top-selling products.
+- Provide financial insights to the Orchestrator.
 
 ## System Workflow
 
-1. **Request Reception**:
-   - Customer submits a request for paper supplies
-   - Orchestrator Agent receives the request and extracts key information
+1.  **Request Reception**:
+    -   A customer submits a request for paper supplies.
+    -   The Orchestrator Agent receives the request and uses its `parse_request` tool to extract key information.
 
-2. **Inventory Check**:
-   - Orchestrator delegates to Inventory Agent
-   - Inventory Agent checks stock levels for requested items
-   - Inventory Agent returns availability status to Orchestrator
+2.  **Inventory Check**:
+    -   The Orchestrator delegates to the Inventory Agent to check stock levels for the requested items.
+    -   The Inventory Agent uses its `check_inventory_status` tool and returns the availability status to the Orchestrator.
 
-3. **Quote Generation**:
-   - Orchestrator delegates to Quote Agent
-   - Quote Agent calculates costs and applies appropriate discounts
-   - Quote Agent references historical quotes for similar requests
-   - Quote Agent returns detailed quote to Orchestrator
+3.  **Quote Generation**:
+    -   The Orchestrator delegates to the Quote Agent.
+    -   The Quote Agent uses `search_quote_history` to find similar past orders and `calculate_bulk_discount` to determine costs and apply appropriate discounts.
+    -   The Quote Agent returns a detailed quote to the Orchestrator.
 
-4. **Order Processing** (if quote is accepted):
-   - Orchestrator delegates to Order Fulfillment Agent
-   - Order Fulfillment Agent creates sales transactions
-   - Order Fulfillment Agent arranges for restocking if needed
-   - Order Fulfillment Agent returns order confirmation to Orchestrator
+4.  **Order Processing** (if a quote is accepted):
+    -   The Orchestrator delegates to the Order Fulfillment Agent.
+    -   The Order Fulfillment Agent uses the `process_order` tool to create sales transactions and arrange for restocking if needed.
+    -   The agent returns an order confirmation to the Orchestrator.
 
-5. **Financial Reporting**:
-   - Orchestrator delegates to Financial Agent
-   - Financial Agent generates financial reports
-   - Financial Agent returns financial status to Orchestrator
+5.  **Financial Reporting**:
+    -   The Orchestrator can delegate to the Financial Agent to get financial status reports using the `get_financial_status` tool.
+    -   The Financial Agent returns the financial status to the Orchestrator.
 
-6. **Response Formulation**:
-   - Orchestrator compiles information from all agents
-   - Orchestrator formulates a comprehensive response to the customer
+6.  **Response Formulation**:
+    -   The Orchestrator compiles information from all agents to formulate a comprehensive response to the customer.
 
 ## Agent Tools and Functions
 
 ### Common Tool for All Agents:
-- `get_available_paper_supplies()`: Returns a list of all available paper supply item names from the paper_supplies list
-
-### Inventory Agent Tools:
-- `check_inventory_status(item_name, quantity, as_of_date)`: Check if the requested item is available in sufficient quantity
-- `get_inventory_report(as_of_date)`: Generate a comprehensive inventory report
-- `restock_inventory(as_of_date, buffer_multiplier)`: Restock items that are below their minimum stock levels
-- `get_all_inventory(as_of_date)`: Retrieve snapshot of available inventory
-- `get_stock_level(item_name, as_of_date)`: Check stock level for specific item
-
-### Quote Agent Tools:
-- `search_quote_history(search_terms, limit)`: Find similar historical quotes
-- `calculate_bulk_discount(item_name, quantity)`: Apply appropriate bulk discounts
-- `format_quote_explanation(items, total_amount, delivery_date)`: Create detailed quote explanation
-
-### Order Fulfillment Agent Tools:
-- `process_order(items, order_date)`: Process an order by creating sales transactions and arranging for restocking if needed
-- `check_order_status(order_id, as_of_date)`: Check the status of an order
-- `get_supplier_delivery_date(input_date_str, quantity)`: Calculate delivery dates
-- `create_transaction(item_name, transaction_type, quantity, price, date)`: Record transactions
-
-### Financial Agent Tools:
-- `get_financial_status(as_of_date)`: Get comprehensive financial status information
-- `get_cash_balance(as_of_date)`: Check current cash balance
-- `generate_financial_report(as_of_date)`: Create comprehensive financial report
+- `get_available_paper_supplies()`: Returns a list of all available paper supply item names from the `paper_supplies` list.
 
 ### Orchestrator Agent Tools:
-- `parse_request(request)`: Parse a customer request to extract key information
+- `parse_request(request)`: Parses a customer request to extract key information like items, quantities, and dates.
 
-## System Flow Diagram
+### Inventory Agent Tools:
+- `check_inventory_status(item_name, quantity, as_of_date)`: Checks if a requested item is available in sufficient quantity.
+- `get_inventory_report(as_of_date)`: Generates a comprehensive inventory report.
+- `restock_inventory(as_of_date, buffer_multiplier)`: Restocks items that are below their minimum stock levels.
+
+### Quote Agent Tools:
+- `search_quote_history(search_terms, limit)`: Finds similar historical quotes to inform pricing.
+- `calculate_bulk_discount(item_name, quantity)`: Calculates and applies appropriate bulk discounts based on quantity.
+
+### Order Fulfillment Agent Tools:
+- `process_order(items, order_date)`: Processes an order by creating sales transactions and arranging for restocking if needed.
+- `get_supplier_delivery_date(input_date_str, quantity)`: Calculates estimated delivery dates from suppliers for restocked items.
+
+### Financial Agent Tools:
+- `get_financial_status(as_of_date)`: Gets comprehensive financial status information, including cash balance, inventory value, and recent performance.
+- `get_cash_balance(as_of_date)`: Checks the current cash balance.
+
+## High-Level System Flow
 
 ```mermaid
 graph TD
-    Customer[Customer Request] --> Orchestrator
+    Customer([Customer]) --> Orchestrator{Orchestrator Agent}
 
-    Orchestrator[Orchestrator Agent] --> Inventory[Inventory Agent]
-    Orchestrator --> Quote[Quote Agent]
-    Orchestrator --> Order[Order Fulfillment Agent]
-    Orchestrator --> Financial[Financial Agent]
+    Orchestrator --> Inventory{Inventory Agent}
+    Orchestrator --> Quote{Quote Agent}
+    Orchestrator --> Order{Order Fulfillment Agent}
+    Orchestrator --> Financial{Financial Agent}
 
     Inventory --> Orchestrator
     Quote --> Orchestrator
     Order --> Orchestrator
     Financial --> Orchestrator
 
-    %% Common Tool for All Agents
-    Orchestrator --> GetAvailablePaperSupplies[get_available_paper_supplies]
-    Inventory --> GetAvailablePaperSupplies
-    Quote --> GetAvailablePaperSupplies
-    Order --> GetAvailablePaperSupplies
-    Financial --> GetAvailablePaperSupplies
-
-    %% Orchestrator Agent Tools
-    Orchestrator --> ParseRequest[parse_request]
-
-    %% Inventory Agent Tools
-    Inventory --> CheckInventoryStatus[check_inventory_status]
-    Inventory --> GetInventoryReport[get_inventory_report]
-    Inventory --> RestockInventory[restock_inventory]
-    Inventory --> GetAllInventory[get_all_inventory]
-    Inventory --> GetStockLevel[get_stock_level]
-
-    %% Quote Agent Tools
-    Quote --> SearchQuoteHistory[search_quote_history]
-    Quote --> CalculateBulkDiscount[calculate_bulk_discount]
-    Quote --> FormatQuoteExplanation[format_quote_explanation]
-
-    %% Order Fulfillment Agent Tools
-    Order --> ProcessOrder[process_order]
-    Order --> CheckOrderStatus[check_order_status]
-    Order --> GetSupplierDeliveryDate[get_supplier_delivery_date]
-    Order --> CreateTransaction[create_transaction]
-
-    %% Financial Agent Tools
-    Financial --> GetFinancialStatus[get_financial_status]
-    Financial --> GetCashBalance[get_cash_balance]
-    Financial --> GenerateFinancialReport[generate_financial_report]
-
-    %% Tool styles
-    classDef tool fill:#f9f,stroke:#333,stroke-width:1px;
-    class GetAvailablePaperSupplies,ParseRequest,CheckInventoryStatus,GetInventoryReport,RestockInventory,GetAllInventory,GetStockLevel,SearchQuoteHistory,CalculateBulkDiscount,FormatQuoteExplanation,ProcessOrder,CheckOrderStatus,GetSupplierDeliveryDate,CreateTransaction,GetFinancialStatus,GetCashBalance,GenerateFinancialReport tool;
+    Orchestrator --> FinalResponse([Final Response])
 ```
 
-## Implementation Considerations
+## Agent-Specific Diagrams
 
-1. **Error Handling**: Each agent should implement robust error handling to manage unexpected inputs or system failures.
-
-2. **Context Management**: The Orchestrator Agent must maintain context throughout the conversation to ensure coherent responses.
-
-3. **Bulk Discounts**: The Quote Agent should implement a consistent approach to bulk discounts based on order size and item type.
-
-4. **Date Handling**: All agents must properly parse and format dates to ensure accurate delivery estimates and transaction records.
-
-5. **Performance Optimization**: The system should minimize database queries by batching requests when possible.
-
-6. **Scalability**: The design allows for future expansion of agent capabilities without disrupting the overall architecture.
-
-## Testing Strategy
-
-The system will be tested using the provided `quote_requests_sample.csv` file, which contains a variety of customer requests. The test harness in `run_test_scenarios()` will evaluate:
-
-1. Correct parsing of customer requests
-2. Accurate inventory checking
-3. Appropriate quote generation with bulk discounts
-4. Proper order fulfillment and transaction recording
-5. Accurate financial reporting
-
-Test results will be logged to `test_results.csv` for analysis and verification.
-
-## Test Result Visualization
-
-To effectively track the system's performance and state changes over time, we will implement visualizations for key metrics:
-
-### Financial State Visualization
+### Orchestrator Agent
+The Orchestrator Agent is the central hub of the system. It parses customer requests and delegates tasks to the appropriate specialized agents.
 
 ```mermaid
-graph LR
-    subgraph Financial Metrics Over Time
-        Cash[Cash Balance] --> Line1[Line Chart]
-        Revenue[Revenue] --> Line1
-        Expenses[Expenses] --> Line1
-        Profit[Profit Margin] --> Line1
+graph TD
+    subgraph Orchestrator Flow
+        direction LR
+        CustomerRequest[Customer Request] --> Orchestrator{Orchestrator Agent}
+        Orchestrator -- "Delegates to" --> SpecializedAgents[Specialized Agents]
+        SpecializedAgents -- "Return info" --> Orchestrator
+        Orchestrator -- "Uses" --> Tools[parse_request, get_available_paper_supplies]
+        Orchestrator --> FinalResponse[Final Response]
+    end
+    subgraph Example
+        direction LR
+        Prompt("I need a quote for 100 sheets of 'Glossy paper'. (Date of request: 2025-08-15)")
     end
 ```
 
-- **Cash Flow Dashboard**: Track cash balance changes after each transaction
-- **Revenue vs. Expenses**: Compare income from sales against costs of restocking
-- **Profit Margin Analysis**: Visualize profit margins by product category
-- **Transaction Volume**: Monitor transaction frequency and volume over time
-
-### Inventory State Visualization
+### Inventory Agent
+The Inventory Agent manages all stock-related inquiries. It interacts with the database to check stock levels, generate reports, and handle restocking.
 
 ```mermaid
-graph LR
-    subgraph Inventory Tracking
-        Stock[Stock Levels] --> Bar1[Bar Chart]
-        Threshold[Restock Thresholds] --> Bar1
-        Pending[Pending Orders] --> Timeline[Timeline View]
-        History[Stock History] --> Line2[Line Chart]
+graph TD
+    subgraph Inventory Agent Flow
+        direction TB
+        Orchestrator{Orchestrator Agent} -- "Requests inventory check" --> InventoryAgent{Inventory Agent}
+        InventoryAgent -- "Uses" --> Tools[check_inventory_status, get_inventory_report, restock_inventory]
+        Tools -- "Query/Update" --> Database[(munder_difflin.db)]
+        InventoryAgent -- "Returns status" --> Orchestrator
+    end
+    subgraph Example
+        direction LR
+        Prompt("Do we have 500 units of 'Cardstock' in stock as of 2025-08-15?")
     end
 ```
 
-- **Stock Level Indicators**: Color-coded visualization of current stock vs. minimum thresholds
-- **Inventory Turnover**: Track how quickly different products are selling
-- **Restock Predictions**: Forecast when items will need restocking based on sales trends
-- **Category Distribution**: Visualize inventory distribution across product categories
-
-### Order State Visualization
+### Quote Agent
+The Quote Agent is responsible for generating price quotes. It references historical data and applies discounts to provide accurate pricing.
 
 ```mermaid
-graph LR
-    subgraph Order Processing
-        Requests[Quote Requests] --> Funnel[Funnel Chart]
-        Quotes[Generated Quotes] --> Funnel
-        Orders[Completed Orders] --> Funnel
-        Timeline[Order Timeline] --> Gantt[Gantt Chart]
+graph TD
+    subgraph Quote Agent Flow
+        direction TB
+        Orchestrator{Orchestrator Agent} -- "Requests quote" --> QuoteAgent{Quote Agent}
+        QuoteAgent -- "Uses" --> Tools[search_quote_history, calculate_bulk_discount]
+        Tools -- "Reads from" --> Database[(munder_difflin.db)]
+        QuoteAgent -- "Returns quote" --> Orchestrator
+    end
+    subgraph Example
+        direction LR
+        Prompt("I need a quote for 100 sheets of 'Glossy paper'. (Date of request: 2025-08-15)")
     end
 ```
 
-- **Order Status Dashboard**: Track orders from quote request to fulfillment
-- **Processing Time Metrics**: Measure and visualize time spent in each stage of order processing
-- **Fulfillment Rate**: Compare quote requests to completed orders
-- **Seasonal Trends**: Identify patterns in order volume and types over time
+### Order Fulfillment Agent
+This agent processes orders, creating sales transactions and managing the restocking process when necessary.
 
-### Implementation Approach
+```mermaid
+graph TD
+    subgraph Order Fulfillment Agent Flow
+        direction TB
+        Orchestrator{Orchestrator Agent} -- "Requests order processing" --> OrderAgent{Order Fulfillment Agent}
+        OrderAgent -- "Uses" --> Tools[process_order, get_supplier_delivery_date]
+        Tools -- "Write to" --> Database[(munder_difflin.db)]
+        OrderAgent -- "Returns confirmation" --> Orchestrator
+    end
+    subgraph Example
+        direction LR
+        Prompt("I want to place an order for 20 'A4 paper' today for a total of $1.00. (Date of request: 2025-08-15)")
+    end
+```
 
-The visualization system will be implemented using:
+### Financial Agent
+The Financial Agent provides insights into the company's financial health by tracking cash flow, inventory value, and overall performance.
 
-1. **Data Collection**: Capture state changes at each step of the multi-agent process
-2. **Time-Series Database**: Store historical state data with timestamps
-3. **Visualization Library**: Use libraries like Matplotlib, Plotly, or D3.js for interactive charts
-4. **Real-Time Updates**: Refresh visualizations as new transactions occur
-5. **Exportable Reports**: Generate PDF or interactive HTML reports for stakeholders
+```mermaid
+graph TD
+    subgraph Financial Agent Flow
+        direction TB
+        Orchestrator{Orchestrator Agent} -- "Requests financial status" --> FinancialAgent{Financial Agent}
+        FinancialAgent -- "Uses" --> Tools[get_financial_status, get_cash_balance]
+        Tools -- "Reads from" --> Database[(munder_difflin.db)]
+        FinancialAgent -- "Returns report" --> Orchestrator
+    end
+    subgraph Example
+        direction LR
+        Prompt("What is our current cash balance as of 2025-08-15?")
+    end
+```
 
-These visualizations will provide valuable insights into system performance, help identify bottlenecks, and support data-driven decision-making for inventory management and business operations.
+## Instruction Prompting
+
+
+To interact with the multi-agent system, prompts should be clear and provide necessary context. The agents are instructed to perform best with specific information:
+
+-   **Use Exact Item Names**: The agents perform best when using the exact item names found in the `paper_supplies` list. The `get_available_paper_supplies()` tool can be used to retrieve a list of valid names. For example, use `"Standard copy paper"` instead of `"copy paper"`. The orchestrator will attempt to map common names to the correct item, but being specific yields better results.
+-   **Specify Dates**: Always include the date of the request in your prompt (e.g., `(Date of request: YYYY-MM-DD)`). This is crucial for accurate inventory checks, financial reporting, and delivery estimates.
+-   **Be Clear and Direct**: Formulate requests clearly. For example:
+    -   **For a quote**: `"I need a quote for 100 sheets of 'Glossy paper' and 50 'Envelopes'. (Date of request: 2025-08-15)"`
+    -   **To place an order**: `"I want to place an order for 20 'A4 paper' today. The total price is $1.00. (Date of request: 2025-08-15)"`
+    -   **For inventory status**: `"Do we have 500 units of 'Cardstock' in stock as of 2025-08-15?"`
+
+## Implemented Result
+
+The project is executed via the `run_test_scenarios` function in `project_starter.py`. This function simulates a series of customer requests and demonstrates the end-to-end functionality of the multi-agent system.
+
+The process is as follows:
+1.  **Database Initialization**: The `init_database()` function sets up the SQLite database, creating tables for transactions, quotes, and inventory, and seeding them with initial data.
+2.  **Test Data Loading**: The `run_test_scenarios` function loads customer requests from `quote_requests_sample.csv`.
+3.  **Request Processing**: Each request is passed to the `orchestrator` agent, which coordinates with the other specialized agents (Inventory, Quote, Order, Financial) to fulfill the request.
+4.  **Logging**: All interactions, tool calls, and agent responses are logged to `project_output.log`, providing a detailed trace of the system's execution.
+5.  **Results Output**: The final response for each test scenario, along with the cash balance and inventory value at that point in time, is saved to `test_results.csv`. This file provides a summary of the system's performance across the test cases.
+
+This implementation provides a robust framework for automating business processes, with clear logging and result tracking for evaluation and debugging.
