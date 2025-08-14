@@ -1672,7 +1672,11 @@ orchestrator = ToolCallingAgent(model=model,
                                       "Use this format for input of tools and output of your responses"
                                       "Also a boiler plate input of 'additional_args': {} is required to call other agents."
                                       "For example: "
-                                      "{'task': '(Date of request: 2025-08-01) I want to check the inventory status of A4 paper.', 'additional_args': {}}",
+                                      "{'task': '(Date of request: 2025-08-01) I want to check the inventory status of A4 paper.', 'additional_args': {}}"
+                                      "When providing final answer. Answer briefly whether the quote order was a success, partial success or a failed with reason."
+                                      "In case of restock, the order is a success if expected stock arrival is before customer's requested date."
+                                      "Example final output: '[Success] Thank you for your order! We have calculated the costs based on your request for 1000 sheets of A4 glossy paper, 500 sheets of A3 matte paper, 2000 sheets of A5 recycled paper, and 10 reams of standard copy paper. To assist you in keeping within budget for your upcoming show, we are pleased to offer a bulk discount on the A5 recycled paper due to the larger quantity ordered. This results in a more rounded overall price. Here's the breakdown: A4 glossy paper at $0.20 each, A3 matte paper at $0.18 each, A5 recycled paper at $0.07 each with the discount applied, and standard copy paper at $0.04 each.'"
+                                ,
                          managed_agents=[inventory_agent, quote_agent, order_agent, financial_agent],
                          max_tool_threads=1)
 
