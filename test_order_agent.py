@@ -37,6 +37,7 @@ def order_agent():
         name="OrderAgent",
         instructions="""
         you are a helpful agent. you will get order request from client. you can process order, check order status, get supplier delivery date.
+        when using 'process_order' tool look at this example to provide arguments arguments: {'order_date': '2025-08-01', 'items': [{'item_name': 'A4 paper', 'quantity': 20, 'price_per_unit': 1}]
         """,
         description="""
         The agent for processing orders. It has access to tools such as process_order, check_order_status, get_supplier_delivery_date.
@@ -56,7 +57,7 @@ def test_get_supplier_delivery_date():
 def test_process_order():
     """Test the process_order tool directly."""
     # Create a simple order with one item
-    items = [OrderItem(item_name="A4 paper", quantity=10)]
+    items = [OrderItem(item_name="A4 paper", quantity=10, price=0.5)]
     result = process_order(items, "2025-08-01")
     print()
     print(result)
@@ -69,7 +70,7 @@ def test_check_order_status():
     """Test the check_order_status tool directly."""
     # First create an order to get an order ID
     init_database()
-    items = [OrderItem(item_name="A4 paper", quantity=10)]
+    items = [OrderItem(item_name="A4 paper", quantity=100, price=5.0)]
     order = process_order(items, "2025-08-01")
     # Get the transaction ID from the first order result
     if order.order_results and len(order.order_results) > 0:
@@ -83,7 +84,7 @@ def test_check_order_status():
 
 def test_order_agent_process_order(order_agent):
     """Test the order agent's ability to process an order."""
-    query = "I want to place an order for 20 boxes of A4 paper today."
+    query = "I want to place an order for 20 boxes of A4 paper today. The price is 1$ in total. (Date of request: 2025-08-01)"
     response = order_agent.run(query)
 
     # Verify the response contains relevant information
