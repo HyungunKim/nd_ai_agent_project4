@@ -1534,14 +1534,17 @@ inventory_agent = ToolCallingAgent(model=model,
                          name="InventoryAgent",
                          description="""
                          The agent for handling inventory logic. It has access to tools such as check_inventory_status, get_inventory_report, and restock_inventory.
-                         """)
+                         """, max_tool_threads=1)
 
 quote_agent = ToolCallingAgent(model=model,
                          tools=[search_quote_history, calculate_bulk_discount],
                          name="QuoteAgent",
+                         instructions="when searching for similar quotes or calculateing bulk discount, drop the plurals. For example, 'A4 paper' instead of 'A4 papers'.",
                          description="""
                          The agent for generating quotes. It has access to tools `search_quote_history` to find past quotes. Apply bulk discount where there was similar preceding quote history to be fair.
-                         """)
+                         Warning! This agent does not have access to current inventory status. Please check the inventory before making a quote.[OrderItem(item_name="A4 paper", quantity=123)]
+                         """,
+                               max_tool_threads=1)
 order_agent = ToolCallingAgent(model=model,
                          tools=[process_order, get_supplier_delivery_date],
                          name="OrderAgent",
@@ -1559,14 +1562,21 @@ financial_agent = ToolCallingAgent(model=model,
                          name="FinancialAgent",
                          description="""
                          The agent for generating financial reports. It has access to tools such as `get_financial_status`, `get_cash_balance`.
-                         """)
+                         """,
+                                   max_tool_threads=1)
 orchestrator = ToolCallingAgent(model=model,
                          tools=[parse_request],
                          instructions="You are a helpful agent. You will get quote request from client. "
                                       "You have to check inventory status, check previous quote history "
                                       "to find appropriate discount, generate quote, process order, "
-                                      "There are other agents that can help you.",
-                         managed_agents=[inventory_agent, quote_agent, order_agent, financial_agent])
+                                      "There are other agents that can help you."
+                                      "Think step by step. Call one necessary tools or agents for that step."
+                                      "When querying to other agents please provide the (Date of request) in the request text."
+                                     "Also a boiler plate input of 'additional_args': {} is required to call other agents."
+                                     "For example: "
+                     "{'task': '(Date of request: 2025-08-01) I want to check the inventory status of A4 paper.', 'additional_args': {}}",
+                         managed_agents=[inventory_agent, quote_agent, order_agent, financial_agent],
+                         max_tool_threads=1)
 
 
 # Run your test scenarios by writing them here. Make sure to keep track of them.
