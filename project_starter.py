@@ -282,14 +282,23 @@ def generate_sample_inventory(paper_supplies: list, coverage: float = 0.4, seed:
 
     # Construct inventory records
     inventory = []
-    for item in selected_items:
-        inventory.append({
-            "item_name": item["item_name"].lower(),
-            "category": item["category"],
-            "unit_price": item["unit_price"],
-            "current_stock": np.random.randint(200, 800),  # Realistic stock range
-            "min_stock_level": np.random.randint(50, 150)  # Reasonable threshold for reordering
-        })
+    for i, item in enumerate(paper_supplies):
+        if item in selected_items:
+            inventory.append({
+                "item_name": item["item_name"].lower(),
+                "category": item["category"],
+                "unit_price": item["unit_price"],
+                "current_stock": np.random.randint(200, 800),  # Realistic stock range
+                "min_stock_level": np.random.randint(50, 150)  # Reasonable threshold for reordering
+            })
+        else:
+            inventory.append({
+                "item_name": item["item_name"].lower(),
+                "category": item["category"],
+                "unit_price": item["unit_price"],
+                "current_stock": 0,
+                "min_stock_level": np.random.randint(50, 150)  # Reasonable threshold for reordering
+            })
 
     # Return inventory as a pandas DataFrame
     return pd.DataFrame(inventory)
