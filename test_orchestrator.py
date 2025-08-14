@@ -61,7 +61,7 @@ def test_parse_request():
 def test_orchestrator_quote_request(orchestrator):
     """Test the orchestrator's ability to handle a quote request."""
     query = "I need a quote for 100 A4 paper for delivery on September 15, 2025. (Date of request: 2025-08-01)"
-    response = orchestrator.run(query, max_steps=5)
+    response = orchestrator.run(query)
 
     # Verify the response contains relevant information
     assert response is not None

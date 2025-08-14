@@ -37,7 +37,8 @@ def order_agent():
         name="OrderAgent",
         instructions="""
         you are a helpful agent. you will get order request from client. you can process order, check order status, get supplier delivery date.
-        when using 'process_order' tool look at this example to provide arguments arguments: {'order_date': '2025-08-01', 'items': [{'item_name': 'A4 paper', 'quantity': 20, 'price_per_unit': 1}]
+        when using 'process_order' tool look at this example to provide arguments arguments: {'order_date': '2025-08-01', 'items': [{'item_name': 'A4 paper', 'quantity': 20, 'price': 1}]
+                                 here the 'price' is total price for that item and quantity.
         """,
         description="""
         The agent for processing orders. It has access to tools such as process_order, check_order_status, get_supplier_delivery_date.

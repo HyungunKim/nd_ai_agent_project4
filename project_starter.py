@@ -1180,7 +1180,7 @@ def process_order(items: List[Union[OrderItem]], order_date: str) -> Order:
         Order: A Pydantic model containing order processing information
 
     Example:
-        'process_order' with arguments: {'order_date': '2025-08-01', 'items': [{'item_name': 'A4 paper', 'quantity': 20, 'price_per_unit': 1}]
+        'process_order' with arguments: {'order_date': '2025-08-01', 'items': [{'item_name': 'A4 paper', 'quantity': 20, 'price': 1}]
     """
     logging.info("Processing order...")
     order_results = []
@@ -1192,11 +1192,15 @@ def process_order(items: List[Union[OrderItem]], order_date: str) -> Order:
         if isinstance(item, OrderItem):
             item_name = item.item_name
             quantity = item.quantity
-            price = item.price or 0
+            # price_per_unit = item.price_per_unit or 0
+            price = item.price or 0#price_per_unit * quantity
+            assert price > 0, "Price must be greater than zero."
         else:
             item_name = item["item_name"]
             quantity = item["quantity"]
-            price = item.get("total_price", 0)
+            # price_per_unit = item.get("price_per_unit", 0)
+            price = item.get("price", 0)#price_per_unit * quantity)
+            assert price > 0, "Price must be greater than zero."
 
         # Check inventory status
         inventory_status = check_inventory_status(item_name, quantity, order_date)
@@ -1550,7 +1554,8 @@ order_agent = ToolCallingAgent(model=model,
                          name="OrderAgent",
                          instructions="""
                                  you are a helpful agent. you will get order request from client. you can process order, check order status, get supplier delivery date.
-                                 when using 'process_order' tool look at this example to provide arguments arguments: {'order_date': '2025-08-01', 'items': [{'item_name': 'A4 paper', 'quantity': 20, 'price_per_unit': 1}]
+                                 when using 'process_order' tool look at this example to provide arguments arguments: {'order_date': '2025-08-01', 'items': [{'item_name': 'A4 paper', 'quantity': 20, 'price': 1}]
+                                 here the 'price' is total price for that item and quantity.
                                  """,
                          description="""
                          The agent for processing orders. It has access to tools such as `process_order`, `get_supplier_delivery_date`.
