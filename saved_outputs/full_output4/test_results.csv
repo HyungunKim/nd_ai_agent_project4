@@ -1,0 +1,56 @@
+request_id,request_date,cash_balance,inventory_value,response
+1,2025-04-01,48986.48,2077.04,"[Success] Your order of 200 sheets of A4 glossy paper, 100 sheets of heavy cardstock, and 100 sheets of colored paper has been successfully processed for delivery by April 15, 2025. Please note that there is a discrepancy between the quoted price of $70.80 and the processed amount of $40.00. Further clarification may be needed regarding this pricing difference."
+2,2025-04-03,48987.48,2062.04,"[Success] Thank you for your order! We have successfully processed your order for 500 sheets of colored paper, 300 rolls of party streamers, and 200 balloons. The total cost for your order is $78.25 with discounts applied. All items will be delivered by April 15, 2025."
+3,2025-04-04,48954.34,2128.3199999999997,"To confirm your order of supplies:
+
+- **10,000 sheets of A4 paper**
+- **5,000 sheets of A3 paper**
+- **500 reams of printer paper**
+
+The delivery is scheduled for **April 15, 2025**, to meet the requirements for your upcoming conference.
+
+Please let me know if you would like to proceed with the order or if you have any additional requests!"
+4,2025-04-05,48962.34,2128.3199999999997,"[Success] Thank you for your order! We have successfully processed your order for 500 sheets of 250 gsm cardstock and 250 sheets of A4 paper, totaling $146.875. Both items will be restocked and delivered by April 15, 2025."
+5,2025-04-05,48962.34,2128.3199999999997,"To place your order for the supplies, you will need to contact your preferred supplier directly or use an online ordering platform. Here are the details you'll want to provide:
+
+1. **Order Items:**
+   - 500 sheets of 8.5""x11"" colored paper
+   - 300 sheets of cardstock in various colors
+   - 200 rolls of decorative washi tape
+
+2. **Delivery Date:** 
+   - Required by April 15, 2025
+
+3. **Contact Information:** 
+   - Ensure you provide your shipping address and any other necessary contact details for delivery.
+
+4. **Payment Method:** 
+   - Be prepared to provide payment information or choose a payment method as per the supplier’s policies.
+
+You can check local office supply stores, craft stores, or online retailers like Amazon, Staples, or Paper Source for these items. Make sure to confirm the availability of the supplies and the estimated delivery time to ensure they arrive by your deadline."
+6,2025-04-06,48993.74,2098.3199999999997,"[Success] Thank you for your order! We have successfully processed your order for 500 sheets of Construction Paper, 300 sheets of Standard Copy Paper, and 200 sheets of Cardstock. The total cost is $71.40, and the items will be delivered by April 10, 2025, in time for your assembly. The inventory for Construction Paper has been restocked, and the item name 'White Printer Paper' has been corrected to 'Standard Copy Paper'."
+7,2025-04-07,48116.47,4247.860000000001,"[Success] Thank you for your order! We have successfully processed your request for 1000 sheets of A3 matte paper, 300 sheets of poster boards (24"" x 36""), and 500 sheets of A4 glossy paper. All items will be delivered by April 15, 2025, with transaction IDs for tracking: A3 matte paper (234), poster boards (230), and A4 glossy paper (232)."
+8,2025-04-07,48116.47,4247.860000000001,"[Partial Success] Thank you for your order! We successfully processed the order for 500 sheets of A4 glossy paper, alongside an order for 2000 sheets of A5 recycled paper, with expected deliveries on April 11, 2025, and April 14, 2025, respectively. However, the orders for 1000 sheets of A4 matte paper and 3000 sheets of A4 recycled paper were not successful due to invalid item names. Please check future orders for correct item names to ensure successful processing."
+9,2025-04-07,48126.47,4235.860000000001,"[Partial Success] Thank you for your order! We successfully processed 100 sheets of A3 paper at a total cost of $10.00. However, the order for 200 sheets of A4 glossy paper could not be fulfilled due to insufficient stock, with a restock date set for April 11, 2025. Additionally, the item for recycled kraft paper envelopes was invalid; please provide clarification or corrections for future orders."
+13,2025-04-08,48120.48,4217.860000000001,"[Partial Success] The order for 200 sheets of cardstock was successfully processed, but the order for 500 sheets of A4 paper could not be fulfilled due to insufficient stock. However, a restock for A4 paper has been initiated, with the expected delivery date of April 12, 2025, which is after the requested delivery date of April 10, 2025."
+12,2025-04-08,48120.48,4217.860000000001,"To fulfill your request for supplies for your upcoming party, we will order the following items:
+
+- **200 sheets of colorful cardstock**
+- **500 sheets of standard printer paper**
+- **100 paper napkins**
+
+Since the request date is April 8, 2025, and you need the supplies delivered by April 15, 2025, we'll proceed with placing this order as soon as possible to ensure timely delivery.
+
+Please confirm if you would like to proceed with this order, and if you have any preferences for the colors of the cardstock or any specific type for the printer paper."
+10,2025-04-08,48120.48,4217.860000000001,"[Success] Thank you for your order! We have processed your request for 500 sheets of A4 glossy paper and 300 sheets of heavy cardstock. The total cost for the glossy paper is $141.75 after discounts applied, and the cardstock is $57.00 after discount as well. Both orders are scheduled for delivery by April 15, 2025, and restocks have been arranged to ensure supply."
+11,2025-04-08,48198.98,4117.860000000001,"[Partial Success] The order for 500 sheets of A3 glossy paper could not be fulfilled due to insufficient stock, as only 139 sheets were available. However, the order for 300 sheets of A4 matte paper was successfully processed, restocking the item with a delivery date set for 2025-04-12. The total cost for the A4 paper order was $78.50."
+14,2025-04-09,47144.83500000001,6357.399999999999,"[Failed] Unfortunately, we were unable to fulfill your request for 5000 sheets of A4 paper, 2000 sheets of poster paper, and 500 sheets of cardstock due to insufficient stock across the board. While we attempted to arrange for restocks, the items were not available for dispatch prior to the requested date of April 15, 2025. If needed, please consider a smaller quantity or different supplies that are currently in stock."
+15,2025-04-12,45156.505000000005,10923.96,"[Partial Success] We have processed your order for 10,000 sheets of A4 white paper, 5,000 sheets of A3 colored paper, and 500 reams of cardstock for signage. However, please note that all items are currently out of stock, with restocking scheduled for April 16, 2025, for cardstock and April 19, 2025, for both types of paper. Unfortunately, these dates exceed your requested delivery date of April 15, 2025."
+16,2025-04-13,45207.505000000005,10868.96,"[Success] Thank you for your order! We have successfully processed your order for 500 sheets of A4 paper and 100 sheets of poster board, totaling $51.00. The delivery is scheduled for April 15, 2025. Additionally, we restocked 78 sheets of poster board to ensure continued availability, with the restock delivery expected on April 17, 2025."
+17,2025-04-14,45435.805,10892.359999999999,"[Failed] Unfortunately, we could not fulfill your order for 1000 sheets of A4 paper, 500 sheets of A3 colored paper, 2000 table napkins, 1000 biodegradable paper cups, and 500 biodegradable paper plates due to insufficient stock levels. All items were unavailable based on current inventory. Please consider alternative sourcing or adjusting your request for future orders."
+18,2025-04-14,45454.805,10872.359999999999,"[Partial Success] While we successfully processed the order for 200 sheets of colored paper for $19.00, the orders for 500 sheets of high-quality white cardstock and 1000 sheets of standard printing paper could not be fulfilled due to insufficient stock. It's recommended to adjust inventory or restock these items for future needs."
+19,2025-04-15,45454.805,10872.359999999999,"[Partial Success] Thank you for your order! We have successfully processed the cardstock order with a total of $756.50 for the supplies. However, the A4 glossy paper and A3 matte paper were insufficiently stocked and will only be restocked by April 22, 2025. The cardstock will be delivered by April 19, 2025."
+20,2025-04-17,67147.355,10987.26,"[Success] Thank you for your order! We have processed the orders successfully for your concert supplies. The confirmation details are as follows: 
+1. **2,000 units of Regular Poster Paper** ordered successfully with a total cost of $22,000, scheduled for delivery on April 24, 2025. 
+2. **2,000 posters using 220 gsm Poster Paper** ordered successfully with a total cost of $2,000, also scheduled for delivery on April 24, 2025.
+Unfortunately, we could not fulfill the order for 5,000 flyers due to insufficient stock. Please consider alternative options for flyers."
