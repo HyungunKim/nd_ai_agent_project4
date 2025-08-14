@@ -89,6 +89,7 @@ This document outlines the design of a multi-agent system for Munder Difflin Pap
 - `get_all_inventory(as_of_date)`: Retrieve snapshot of available inventory
 - `get_stock_level(item_name, as_of_date)`: Check stock level for specific item
 - `check_restock_needs(item_name, quantity, as_of_date)`: Determine if restocking is needed
+- `restock_inventory(as_of_date, buffer_multiplier)`: Restock items that are below their minimum stock levels
 
 ### Quote Agent Tools:
 - `search_quote_history(search_terms, limit)`: Find similar historical quotes

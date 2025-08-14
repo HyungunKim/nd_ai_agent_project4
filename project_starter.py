@@ -66,6 +66,12 @@ class RestockResult(BaseModel):
     delivery_date: Optional[str] = None
     transaction_id: Optional[int] = None
 
+class RestockReport(BaseModel):
+    as_of_date: str
+    restocked_items: List[RestockResult]
+    total_items_restocked: int
+    total_restock_cost: float
+
 class Order(BaseModel):
     order_date: str
     order_results: List[OrderResult]
@@ -825,6 +831,95 @@ def check_inventory_status(item_name: str, quantity: int, as_of_date: str) -> In
     )
 
 @tool
+def restock_inventory(as_of_date: str, buffer_multiplier: float = 1.5) -> RestockReport:
+    """
+    Restock inventory items that are below their minimum stock levels.
+
+    This function identifies items that are below their minimum stock levels,
+    creates stock_orders transactions to restock them, and returns information
+    about the restocked items.
+
+    Args:
+        as_of_date (str): The date to restock inventory as of
+        buffer_multiplier (float, optional): Multiplier for the buffer stock. 
+                                            Default is 1.5, meaning items will be 
+                                            restocked to 1.5 times their minimum level.
+
+    Returns:
+        RestockReport: A Pydantic model containing information about the restocked items
+    """
+    # Get inventory report to identify items below threshold
+    inventory_report = get_inventory_report(as_of_date)
+
+    # Items to restock are those below threshold
+    items_to_restock = inventory_report.items_below_threshold_list + inventory_report.items_out_of_stock_list
+
+    # Process restocking for items that need it
+    restock_results = []
+    total_restock_cost = 0.0
+
+    for item in items_to_restock:
+        item_name = item.item_name
+        min_stock_level = item.min_stock_level
+        current_stock = item.current_stock
+
+        # Calculate restock quantity to bring stock to min_stock_level * buffer_multiplier
+        target_stock = int(min_stock_level * buffer_multiplier)
+        restock_quantity = target_stock - current_stock
+
+        # Get unit price from inventory
+        inventory_query = f"SELECT unit_price FROM inventory WHERE item_name = '{item_name}'"
+        price_result = pd.read_sql(inventory_query, db_engine)
+
+        if not price_result.empty:
+            unit_price = price_result["unit_price"].iloc[0]
+            restock_price = restock_quantity * unit_price / DEFUALT_MARKUP  # Cost to restock
+
+            # Calculate supplier delivery date
+            supplier_delivery_date = get_supplier_delivery_date(as_of_date, restock_quantity)
+
+            try:
+                # Create stock order transaction
+                transaction_id = create_transaction(
+                    item_name=item_name,
+                    transaction_type="stock_orders",
+                    quantity=restock_quantity,
+                    price=restock_price,
+                    date=supplier_delivery_date
+                )
+
+                # Add to restock results
+                restock_results.append(RestockResult(
+                    item_name=item_name,
+                    quantity=restock_quantity,
+                    price=restock_price,
+                    status="Restocked",
+                    delivery_date=supplier_delivery_date,
+                    transaction_id=transaction_id
+                ))
+
+                total_restock_cost += restock_price
+
+            except Exception as e:
+                # Add failed restock to results
+                restock_results.append(RestockResult(
+                    item_name=item_name,
+                    quantity=restock_quantity,
+                    price=0.0,
+                    status=f"Error: {str(e)}",
+                    delivery_date=None,
+                    transaction_id=None
+                ))
+
+    # Create and return the restock report
+    return RestockReport(
+        as_of_date=as_of_date,
+        restocked_items=restock_results,
+        total_items_restocked=len(restock_results),
+        total_restock_cost=total_restock_cost
+    )
+
+@tool
 def get_inventory_report(as_of_date: str) -> InventoryReport:
     """
     Generate a comprehensive inventory report as of a specific date.
@@ -1432,10 +1527,10 @@ class FinancialAgent(ToolCallingAgent):
 
 # Initialize the agents
 inventory_agent = ToolCallingAgent(model=model,
-                         tools=[check_inventory_status, get_inventory_report],
+                         tools=[check_inventory_status, get_inventory_report, restock_inventory],
                          name="InventoryAgent",
                          description="""
-                         The agent for handling inventory logic. It has access to tools such as check_inventory_status and get_inventory_report.
+                         The agent for handling inventory logic. It has access to tools such as check_inventory_status, get_inventory_report, and restock_inventory.
                          """)
 
 quote_agent = ToolCallingAgent(model=model,
