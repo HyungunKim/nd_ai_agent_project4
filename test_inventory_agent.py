@@ -172,6 +172,28 @@ def test_restock_inventory():
 
 def test_inventory_agent_restock(inventory_agent):
     """Test the inventory agent's ability to restock inventory."""
+
+    create_transaction(
+        item_name="A4 paper",
+        transaction_type="sales",
+        quantity=700,
+        price=50,
+        date="2025-07-31"
+    )
+    create_transaction(
+        item_name="Letter-sized paper",
+        transaction_type="sales",
+        quantity=700,
+        price=50,
+        date="2025-07-31"
+    )
+    create_transaction(
+        item_name="Cardstockr",
+        transaction_type="sales",
+        quantity=800,
+        price=50,
+        date="2025-07-31"
+    )
     query = "Restock all inventory items that are below their minimum stock levels as of August 1, 2025."
     response = inventory_agent.run(query)
 
