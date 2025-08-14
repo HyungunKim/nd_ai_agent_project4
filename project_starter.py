@@ -6,9 +6,10 @@ import dotenv
 import ast
 from sqlalchemy.sql import text
 from datetime import datetime, timedelta
-from typing import Dict, List, Union
+from typing import Dict, List, Union, Optional
 from sqlalchemy import create_engine, Engine
 import logging
+from pydantic import BaseModel, Field
 from smolagents import (
     ToolCallingAgent,
     CodeAgent,
@@ -17,6 +18,137 @@ from smolagents import (
 )
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(funcName)s - %(message)s', filename='project_output.log', filemode='w')
+
+# Pydantic models for data structures
+class PaperSupply(BaseModel):
+    item_name: str
+    category: str
+    unit_price: float
+
+class QuoteItem(BaseModel):
+    item_name: str
+    quantity: int
+    unit_price: Optional[float] = None
+    discount_percentage: Optional[float] = None
+    total_price: Optional[float] = None
+
+class Quote(BaseModel):
+    request: str
+    request_date: str
+    items: List[QuoteItem]
+    total_amount: float
+    delivery_date: str
+    explanation: str
+    similar_quotes: Optional[List[Dict]] = None
+
+class OrderItem(BaseModel):
+    item_name: str
+    quantity: int
+    price: Optional[float] = None
+
+class OrderResult(BaseModel):
+    item_name: str
+    quantity: int
+    price: float
+    status: str
+    transaction_id: Optional[int] = None
+
+class RestockItem(BaseModel):
+    item_name: str
+    quantity: int
+    min_stock_level: int
+
+class RestockResult(BaseModel):
+    item_name: str
+    quantity: int
+    price: float
+    status: str
+    delivery_date: Optional[str] = None
+    transaction_id: Optional[int] = None
+
+class Order(BaseModel):
+    order_date: str
+    order_results: List[OrderResult]
+    total_sales_amount: float
+    restock_results: List[RestockResult]
+    all_items_processed: bool
+
+class InventoryStatus(BaseModel):
+    item_name: str
+    available: bool
+    requested_quantity: int
+    current_stock: int
+    min_stock_level: Optional[int] = None
+    status: str
+    needs_restock: bool
+    restock_quantity: int
+
+class InventoryItem(BaseModel):
+    item_name: str
+    category: str
+    unit_price: float
+    current_stock: int
+    min_stock_level: int
+
+class InventoryReport(BaseModel):
+    as_of_date: str
+    total_items: int
+    items_in_stock: int
+    items_below_threshold: int
+    items_out_of_stock: int
+    inventory_value: float
+    items_below_threshold_list: List[InventoryItem]
+    items_in_stock_list: List[InventoryItem]
+    items_out_of_stock_list: List[InventoryItem]
+
+class BulkDiscountInfo(BaseModel):
+    item_name: str
+    quantity: int
+    unit_price: float
+    discount_percentage: float
+    discounted_unit_price: Optional[float] = None
+    total_price: float
+    error: Optional[str] = None
+
+class OrderStatus(BaseModel):
+    order_id: int
+    status: str
+    transaction_type: Optional[str] = None
+    item_name: Optional[str] = None
+    quantity: Optional[int] = None
+    price: Optional[float] = None
+    transaction_date: Optional[str] = None
+    inventory_status: Optional[InventoryStatus] = None
+    expected_delivery_date: Optional[str] = None
+    details: Optional[str] = None
+
+class FinancialReport(BaseModel):
+    as_of_date: str
+    total_sales: float
+    total_expenses: float
+    net_profit: float
+    profit_margin: float
+    inventory_value: float
+    monthly_summary: Dict[str, Dict[str, float]]
+
+class FinancialStatus(BaseModel):
+    as_of_date: str
+    cash_balance: float
+    inventory_value: float
+    total_assets: float
+    revenue_30_days: float
+    expenses_30_days: float
+    profit_30_days: float
+    profit_margin: float
+    top_selling_products: List[Dict]
+    recent_transactions: List[Dict]
+    inventory_summary: List[Dict]
+
+class RequestInfo(BaseModel):
+    request_text: str
+    request_date: str
+    requested_items: List[Dict]
+    requested_delivery_date: Optional[str] = None
 
 # Create an SQLite database
 logging.info('Logging started')
@@ -587,11 +719,11 @@ def search_quote_history(search_terms: List[str], limit: int = 5) -> List[Dict]:
         ORDER BY q.order_date DESC
         LIMIT {limit}
     """
-
     # Execute parameterized query
     with db_engine.connect() as conn:
         result = conn.execute(text(query), params)
-        return [dict(row) for row in result]
+    df = pd.DataFrame(result.fetchall(), columns=["original_request", "total_amount", "quote_explanation", "job_type", "order_size", "event_type", "order_date"])
+    return list(df.to_dict(orient='index').values())
 
 ########################
 ########################
@@ -611,14 +743,14 @@ import dotenv
 dotenv.load_dotenv()
 openai_api_key = os.getenv("UDACITY_OPENAI_API_KEY")
 model = OpenAIServerModel(
-    model_id="gpt-4o-nano",
+    model_id="gpt-4o-mini",
     api_base="https://openai.vocareum.com/v1",
     api_key=openai_api_key,
 )
 
 # Tools for inventory agent
 @tool
-def check_inventory_status(item_name: str, quantity: int, as_of_date: str) -> Dict:
+def check_inventory_status(item_name: str, quantity: int, as_of_date: str) -> InventoryStatus:
     """
     Check if the requested item is available in sufficient quantity and provide inventory status.
 
@@ -628,21 +760,21 @@ def check_inventory_status(item_name: str, quantity: int, as_of_date: str) -> Di
         as_of_date (str): The date to check inventory as of
 
     Returns:
-        Dict: A dictionary containing inventory status information
+        InventoryStatus: A Pydantic model containing inventory status information
     """
     # Get current stock level
     stock_info = get_stock_level(item_name, as_of_date)
 
     if stock_info.empty:
-        return {
-            "item_name": item_name,
-            "available": False,
-            "requested_quantity": quantity,
-            "current_stock": 0,
-            "status": "Item not found in inventory",
-            "needs_restock": True,
-            "restock_quantity": quantity
-        }
+        return InventoryStatus(
+            item_name=item_name,
+            available=False,
+            requested_quantity=quantity,
+            current_stock=0,
+            status="Item not found in inventory",
+            needs_restock=True,
+            restock_quantity=quantity
+        )
 
     current_stock = stock_info["current_stock"].iloc[0]
 
@@ -668,19 +800,19 @@ def check_inventory_status(item_name: str, quantity: int, as_of_date: str) -> Di
     if needs_restock:
         restock_quantity = (min_stock_level + buffer) - remaining_stock
 
-    return {
-        "item_name": item_name,
-        "available": available,
-        "requested_quantity": quantity,
-        "current_stock": current_stock,
-        "min_stock_level": min_stock_level,
-        "status": "Available" if available else "Insufficient stock",
-        "needs_restock": needs_restock,
-        "restock_quantity": restock_quantity if needs_restock else 0
-    }
+    return InventoryStatus(
+        item_name=item_name,
+        available=available,
+        requested_quantity=quantity,
+        current_stock=current_stock,
+        min_stock_level=min_stock_level,
+        status="Available" if available else "Insufficient stock",
+        needs_restock=needs_restock,
+        restock_quantity=restock_quantity if needs_restock else 0
+    )
 
 @tool
-def get_inventory_report(as_of_date: str) -> Dict:
+def get_inventory_report(as_of_date: str) -> InventoryReport:
     """
     Generate a comprehensive inventory report as of a specific date.
 
@@ -688,7 +820,7 @@ def get_inventory_report(as_of_date: str) -> Dict:
         as_of_date (str): The date to generate the report for
 
     Returns:
-        Dict: A dictionary containing inventory report information
+        InventoryReport: A Pydantic model containing inventory report information
     """
     # Get all inventory items
     inventory_df = pd.read_sql("SELECT * FROM inventory", db_engine)
@@ -697,47 +829,57 @@ def get_inventory_report(as_of_date: str) -> Dict:
     current_inventory = get_all_inventory(as_of_date)
 
     # Prepare report data
-    items_below_threshold = []
-    items_in_stock = []
-    items_out_of_stock = []
+    items_below_threshold_list = []
+    items_in_stock_list = []
+    items_out_of_stock_list = []
+    inventory_value = 0
 
     for _, item in inventory_df.iterrows():
         item_name = item["item_name"]
         min_stock_level = item["min_stock_level"]
+        unit_price = item["unit_price"]
+        category = item["category"]
 
         # Get current stock level
         current_stock = current_inventory.get(item_name, 0)
 
-        item_info = {
-            "item_name": item_name,
-            "category": item["category"],
-            "unit_price": item["unit_price"],
-            "current_stock": current_stock,
-            "min_stock_level": min_stock_level
-        }
+        # Calculate inventory value
+        item_value = current_stock * unit_price
+        inventory_value += item_value
+
+        # Create InventoryItem
+        inventory_item = InventoryItem(
+            item_name=item_name,
+            category=category,
+            unit_price=unit_price,
+            current_stock=current_stock,
+            min_stock_level=min_stock_level
+        )
 
         # Categorize items
         if current_stock == 0:
-            items_out_of_stock.append(item_info)
+            items_out_of_stock_list.append(inventory_item)
         elif current_stock < min_stock_level:
-            items_below_threshold.append(item_info)
+            items_below_threshold_list.append(inventory_item)
         else:
-            items_in_stock.append(item_info)
+            items_in_stock_list.append(inventory_item)
 
-    return {
-        "as_of_date": as_of_date,
-        "total_items": len(inventory_df),
-        "items_in_stock": len(items_in_stock),
-        "items_below_threshold": len(items_below_threshold),
-        "items_out_of_stock": len(items_out_of_stock),
-        "detailed_below_threshold": items_below_threshold,
-        "detailed_out_of_stock": items_out_of_stock
-    }
+    return InventoryReport(
+        as_of_date=as_of_date,
+        total_items=len(inventory_df),
+        items_in_stock=len(items_in_stock_list),
+        items_below_threshold=len(items_below_threshold_list),
+        items_out_of_stock=len(items_out_of_stock_list),
+        inventory_value=inventory_value,
+        items_below_threshold_list=items_below_threshold_list,
+        items_in_stock_list=items_in_stock_list,
+        items_out_of_stock_list=items_out_of_stock_list
+    )
 
 
 # Tools for quoting agent
 @tool
-def calculate_bulk_discount(item_name: str, quantity: int) -> Dict:
+def calculate_bulk_discount(item_name: str, quantity: int) -> BulkDiscountInfo:
     """
     Calculate the appropriate bulk discount for an item based on quantity.
 
@@ -746,7 +888,7 @@ def calculate_bulk_discount(item_name: str, quantity: int) -> Dict:
         quantity (int): The quantity ordered
 
     Returns:
-        Dict: A dictionary containing discount information
+        BulkDiscountInfo: A Pydantic model containing discount information
     """
     # Get the base unit price for the item
     inventory_query = f"SELECT unit_price FROM inventory WHERE item_name = '{item_name}'"
@@ -759,15 +901,15 @@ def calculate_bulk_discount(item_name: str, quantity: int) -> Dict:
                 unit_price = item["unit_price"]
                 break
         else:
-            return {
-                "item_name": item_name,
-                "quantity": quantity,
-                "unit_price": 0,
-                "discount_percentage": 0,
-                "discounted_unit_price": 0,
-                "total_price": 0,
-                "error": "Item not found"
-            }
+            return BulkDiscountInfo(
+                item_name=item_name,
+                quantity=quantity,
+                unit_price=0,
+                discount_percentage=0,
+                discounted_unit_price=0,
+                total_price=0,
+                error="Item not found"
+            )
     else:
         unit_price = price_result["unit_price"].iloc[0]
 
@@ -785,14 +927,14 @@ def calculate_bulk_discount(item_name: str, quantity: int) -> Dict:
     discounted_unit_price = unit_price * (1 - discount_percentage / 100)
     total_price = discounted_unit_price * quantity
 
-    return {
-        "item_name": item_name,
-        "quantity": quantity,
-        "unit_price": unit_price,
-        "discount_percentage": discount_percentage,
-        "discounted_unit_price": discounted_unit_price,
-        "total_price": total_price
-    }
+    return BulkDiscountInfo(
+        item_name=item_name,
+        quantity=quantity,
+        unit_price=unit_price,
+        discount_percentage=discount_percentage,
+        discounted_unit_price=discounted_unit_price,
+        total_price=total_price
+    )
 
 @tool
 def format_quote_explanation(items: List[Dict], total_amount: float, delivery_date: str) -> str:
@@ -827,112 +969,128 @@ def format_quote_explanation(items: List[Dict], total_amount: float, delivery_da
 
     return explanation
 
-@tool
-def generate_quote(request: str, request_date: str) -> Dict:
-    """
-    Generate a complete quote based on a customer request.
-
-    Args:
-        request (str): The customer request text
-        request_date (str): The date of the request
-
-    Returns:
-        Dict: A dictionary containing the complete quote information
-    """
-    # Extract items and quantities from the request
-    # This is a simplified version - in a real system, this would use NLP
-    items = []
-
-    # Look for common paper types in the request
-    for item in paper_supplies:
-        item_name = item["item_name"].lower()
-        if item_name in request.lower():
-            # Try to find quantity before the item name
-            request_lower = request.lower()
-            item_index = request_lower.find(item_name)
-
-            # Look for numbers before the item name
-            quantity = 100  # Default quantity
-
-            # Simple regex to find numbers before the item name
-            import re
-            quantity_matches = re.findall(r'(\d+)\s+(?:sheets|reams|rolls|packs|boxes)?\s+(?:of\s+)?(?:.*?)?' + re.escape(item_name), request_lower)
-
-            if quantity_matches:
-                quantity = int(quantity_matches[0])
-
-            items.append({
-                "item_name": item["item_name"],
-                "quantity": quantity
-            })
-
-    # If no items were found, add some default items
-    if not items:
-        items.append({
-            "item_name": "A4 paper",
-            "quantity": 500
-        })
-
-    # Calculate prices and discounts for each item
-    total_amount = 0
-    for i, item in enumerate(items):
-        discount_info = calculate_bulk_discount(item["item_name"], item["quantity"])
-        items[i].update(discount_info)
-        total_amount += discount_info["total_price"]
-
-    # Round total to a nice number
-    total_amount = round(total_amount)
-
-    # Calculate delivery date
-    # Assume delivery is 7 days from request date
-    from datetime import datetime, timedelta
-    request_date_dt = datetime.fromisoformat(request_date.split("T")[0] if "T" in request_date else request_date)
-    delivery_date = (request_date_dt + timedelta(days=7)).strftime("%Y-%m-%d")
-
-    # Format explanation
-    explanation = format_quote_explanation(items, total_amount, delivery_date)
-
-    # Look for similar quotes in history
-    search_terms = [item["item_name"] for item in items]
-    similar_quotes = search_quote_history(search_terms)
-
-    return {
-        "request": request,
-        "request_date": request_date,
-        "items": items,
-        "total_amount": total_amount,
-        "delivery_date": delivery_date,
-        "explanation": explanation,
-        "similar_quotes": similar_quotes
-    }
+# @tool
+# def generate_quote(request: str, request_date: str) -> Quote:
+#     """
+#     Generate a complete quote based on a customer request.
+#
+#     Args:
+#         request (str): The customer request text
+#         request_date (str): The date of the request
+#
+#     Returns:
+#         Quote: A Pydantic model containing the complete quote information
+#     """
+#     # Extract items and quantities from the request
+#     # This is a simplified version - in a real system, this would use NLP
+#     quote_items = []
+#
+#     # Look for common paper types in the request
+#     for item in paper_supplies:
+#         item_name = item["item_name"].lower()
+#         if item_name in request.lower():
+#             # Try to find quantity before the item name
+#             request_lower = request.lower()
+#             item_index = request_lower.find(item_name)
+#
+#             # Look for numbers before the item name
+#             quantity = 100  # Default quantity
+#
+#             # Simple regex to find numbers before the item name
+#             import re
+#             quantity_matches = re.findall(r'(\d+)\s+(?:sheets|reams|rolls|packs|boxes)?\s+(?:of\s+)?(?:.*?)?' + re.escape(item_name), request_lower)
+#
+#             if quantity_matches:
+#                 quantity = int(quantity_matches[0])
+#
+#             quote_items.append(QuoteItem(
+#                 item_name=item["item_name"],
+#                 quantity=quantity
+#             ))
+#
+#     # If no items were found, add some default items
+#     if not quote_items:
+#         quote_items.append(QuoteItem(
+#             item_name="A4 paper",
+#             quantity=500
+#         ))
+#
+#     # Calculate prices and discounts for each item
+#     total_amount = 0
+#     for i, item in enumerate(quote_items):
+#         discount_info = calculate_bulk_discount(item.item_name, item.quantity)
+#         quote_items[i].unit_price = discount_info.unit_price
+#         quote_items[i].discount_percentage = discount_info.discount_percentage
+#         quote_items[i].total_price = discount_info.total_price
+#         total_amount += discount_info.total_price
+#
+#     # Round total to a nice number
+#     total_amount = round(total_amount)
+#
+#     # Calculate delivery date
+#     # Assume delivery is 7 days from request date
+#     from datetime import datetime, timedelta
+#     request_date_dt = datetime.fromisoformat(request_date.split("T")[0] if "T" in request_date else request_date)
+#     delivery_date = (request_date_dt + timedelta(days=7)).strftime("%Y-%m-%d")
+#
+#     # Format explanation
+#     # Convert Pydantic models to dictionaries for compatibility with existing function
+#     items_dict = [item.model_dump() for item in quote_items]
+#     explanation = format_quote_explanation(items_dict, total_amount, delivery_date)
+#
+#     # Look for similar quotes in history
+#     search_terms = [item.item_name for item in quote_items]
+#     similar_quotes = search_quote_history(search_terms)
+#
+#     # Create and return the Quote object
+#     return Quote(
+#         request=request,
+#         request_date=request_date,
+#         items=quote_items,
+#         total_amount=total_amount,
+#         delivery_date=delivery_date,
+#         explanation=explanation,
+#         similar_quotes=similar_quotes
+#     )
 
 
 # Tools for ordering agent1
 @tool
-def process_order(items: List[Dict], order_date: str) -> Dict:
+def process_order(items: List[Union[Dict, OrderItem]], order_date: str) -> Order:
     """
     Process an order by creating sales transactions and arranging for restocking if needed.
 
     Args:
-        items (List[Dict]): List of items with their quantities and prices
+        items (List[Union[Dict, OrderItem]]): List of items with their quantities and prices
+            class OrderItem(BaseModel):
+                item_name: str
+                quantity: int
+                price: Optional[float] = None
         order_date (str): The date of the order
 
     Returns:
-        Dict: A dictionary containing order processing information
+        Order: A Pydantic model containing order processing information
     """
+    logging.info("Processing order...")
     order_results = []
     total_sales_amount = 0
     restock_items = []
 
     for item in items:
-        item_name = item["item_name"]
-        quantity = item["quantity"]
-        price = item.get("total_price", 0)
+        # Handle both Dict and OrderItem inputs
+        if isinstance(item, OrderItem):
+            item_name = item.item_name
+            quantity = item.quantity
+            price = item.price or 0
+        else:
+            item_name = item["item_name"]
+            quantity = item["quantity"]
+            price = item.get("total_price", 0)
 
         # Check inventory status
         inventory_status = check_inventory_status(item_name, quantity, order_date)
 
-        if inventory_status["available"]:
+        if inventory_status.available:
             # Create sales transaction
             try:
                 transaction_id = create_transaction(
@@ -943,52 +1101,52 @@ def process_order(items: List[Dict], order_date: str) -> Dict:
                     date=order_date
                 )
 
-                order_results.append({
-                    "item_name": item_name,
-                    "quantity": quantity,
-                    "price": price,
-                    "status": "Processed",
-                    "transaction_id": transaction_id
-                })
+                order_results.append(OrderResult(
+                    item_name=item_name,
+                    quantity=quantity,
+                    price=price,
+                    status="Processed",
+                    transaction_id=transaction_id
+                ))
 
                 total_sales_amount += price
 
                 # Check if restocking is needed
-                if inventory_status["needs_restock"]:
-                    restock_items.append({
-                        "item_name": item_name,
-                        "quantity": inventory_status["restock_quantity"],
-                        "min_stock_level": inventory_status["min_stock_level"]
-                    })
+                if inventory_status.needs_restock:
+                    restock_items.append(RestockItem(
+                        item_name=item_name,
+                        quantity=inventory_status.restock_quantity,
+                        min_stock_level=inventory_status.min_stock_level
+                    ))
             except Exception as e:
-                order_results.append({
-                    "item_name": item_name,
-                    "quantity": quantity,
-                    "price": price,
-                    "status": f"Error: {str(e)}",
-                    "transaction_id": None
-                })
+                order_results.append(OrderResult(
+                    item_name=item_name,
+                    quantity=quantity,
+                    price=price,
+                    status=f"Error: {str(e)}",
+                    transaction_id=None
+                ))
         else:
-            order_results.append({
-                "item_name": item_name,
-                "quantity": quantity,
-                "price": price,
-                "status": "Insufficient stock",
-                "transaction_id": None
-            })
+            order_results.append(OrderResult(
+                item_name=item_name,
+                quantity=quantity,
+                price=price,
+                status="Insufficient stock",
+                transaction_id=None
+            ))
 
             # Add to restock items
-            restock_items.append({
-                "item_name": item_name,
-                "quantity": max(quantity, inventory_status["restock_quantity"]),
-                "min_stock_level": inventory_status.get("min_stock_level", 100)
-            })
+            restock_items.append(RestockItem(
+                item_name=item_name,
+                quantity=max(quantity, inventory_status.restock_quantity),
+                min_stock_level=inventory_status.min_stock_level or 100
+            ))
 
     # Process restocking for items that need it
     restock_results = []
     for restock_item in restock_items:
-        item_name = restock_item["item_name"]
-        restock_quantity = restock_item["quantity"]
+        item_name = restock_item.item_name
+        restock_quantity = restock_item.quantity
 
         # Get unit price from inventory
         inventory_query = f"SELECT unit_price FROM inventory WHERE item_name = '{item_name}'"
@@ -1011,43 +1169,46 @@ def process_order(items: List[Dict], order_date: str) -> Dict:
                     date=supplier_delivery_date
                 )
 
-                restock_results.append({
-                    "item_name": item_name,
-                    "quantity": restock_quantity,
-                    "price": restock_price,
-                    "status": "Restocked",
-                    "delivery_date": supplier_delivery_date,
-                    "transaction_id": transaction_id
-                })
+                restock_results.append(RestockResult(
+                    item_name=item_name,
+                    quantity=restock_quantity,
+                    price=restock_price,
+                    status="Restocked",
+                    delivery_date=supplier_delivery_date,
+                    transaction_id=transaction_id
+                ))
             except Exception as e:
-                restock_results.append({
-                    "item_name": item_name,
-                    "quantity": restock_quantity,
-                    "price": restock_price,
-                    "status": f"Restock Error: {str(e)}",
-                    "delivery_date": supplier_delivery_date,
-                    "transaction_id": None
-                })
+                restock_results.append(RestockResult(
+                    item_name=item_name,
+                    quantity=restock_quantity,
+                    price=restock_price,
+                    status=f"Restock Error: {str(e)}",
+                    delivery_date=supplier_delivery_date,
+                    transaction_id=None
+                ))
         else:
-            restock_results.append({
-                "item_name": item_name,
-                "quantity": restock_quantity,
-                "price": 0,
-                "status": "Item not found in inventory",
-                "delivery_date": None,
-                "transaction_id": None
-            })
-
-    return {
-        "order_date": order_date,
-        "total_sales_amount": total_sales_amount,
-        "order_results": order_results,
-        "restock_results": restock_results,
-        "all_items_processed": all(result["status"] == "Processed" for result in order_results)
-    }
+            restock_results.append(RestockResult(
+                item_name=item_name,
+                quantity=restock_quantity,
+                price=0,
+                status="Item not found in inventory",
+                delivery_date=None,
+                transaction_id=None
+            ))
+    try:
+        ...
+    except Exception as e:
+        ...
+    return Order(
+        order_date=order_date,
+        total_sales_amount=total_sales_amount,
+        order_results=order_results,
+        restock_results=restock_results,
+        all_items_processed=all(result.status == "Processed" for result in order_results)
+    )
 
 @tool
-def check_order_status(order_id: int, as_of_date: str) -> Dict:
+def check_order_status(order_id: int, as_of_date: str) -> OrderStatus:
     """
     Check the status of an order based on its transactions.
 
@@ -1056,7 +1217,7 @@ def check_order_status(order_id: int, as_of_date: str) -> Dict:
         as_of_date (str): The date to check the status as of
 
     Returns:
-        Dict: A dictionary containing order status information
+        OrderStatus: A Pydantic model containing order status information
     """
     # In a real system, we would have an orders table to track this
     # For this implementation, we'll use the transaction ID as the order ID
@@ -1071,11 +1232,11 @@ def check_order_status(order_id: int, as_of_date: str) -> Dict:
     transaction = pd.read_sql(query, db_engine)
 
     if transaction.empty:
-        return {
-            "order_id": order_id,
-            "status": "Not found",
-            "details": "No transaction found with this ID"
-        }
+        return OrderStatus(
+            order_id=order_id,
+            status="Not found",
+            details="No transaction found with this ID"
+        )
 
     # Get transaction details
     transaction_type = transaction["transaction_type"].iloc[0]
@@ -1088,16 +1249,16 @@ def check_order_status(order_id: int, as_of_date: str) -> Dict:
         # Check if the item is still in stock
         inventory_status = check_inventory_status(item_name, quantity, as_of_date)
 
-        return {
-            "order_id": order_id,
-            "status": "Completed" if inventory_status["available"] else "Partially Fulfilled",
-            "transaction_type": transaction_type,
-            "item_name": item_name,
-            "quantity": quantity,
-            "price": price,
-            "transaction_date": transaction_date,
-            "inventory_status": inventory_status
-        }
+        return OrderStatus(
+            order_id=order_id,
+            status="Completed" if inventory_status.available else "Partially Fulfilled",
+            transaction_type=transaction_type,
+            item_name=item_name,
+            quantity=quantity,
+            price=price,
+            transaction_date=transaction_date,
+            inventory_status=inventory_status
+        )
     else:  # stock_orders
         # Calculate expected delivery date
         supplier_delivery_date = get_supplier_delivery_date(transaction_date, quantity)
@@ -1109,21 +1270,21 @@ def check_order_status(order_id: int, as_of_date: str) -> Dict:
 
         status = "Delivered" if as_of_date_dt >= delivery_date_dt else "In Transit"
 
-        return {
-            "order_id": order_id,
-            "status": status,
-            "transaction_type": transaction_type,
-            "item_name": item_name,
-            "quantity": quantity,
-            "price": price,
-            "transaction_date": transaction_date,
-            "expected_delivery_date": supplier_delivery_date
-        }
+        return OrderStatus(
+            order_id=order_id,
+            status=status,
+            transaction_type=transaction_type,
+            item_name=item_name,
+            quantity=quantity,
+            price=price,
+            transaction_date=transaction_date,
+            expected_delivery_date=supplier_delivery_date
+        )
 
 
 # Tools for financial agent
 @tool
-def get_financial_status(as_of_date: str) -> Dict:
+def get_financial_status(as_of_date: str) -> FinancialStatus:
     """
     Get comprehensive financial status information as of a specific date.
 
@@ -1131,7 +1292,7 @@ def get_financial_status(as_of_date: str) -> Dict:
         as_of_date (str): The date to get financial status for
 
     Returns:
-        Dict: A dictionary containing financial status information
+        FinancialStatus: A Pydantic model containing financial status information
     """
     # Generate a complete financial report
     financial_report = generate_financial_report(as_of_date)
@@ -1186,23 +1347,23 @@ def get_financial_status(as_of_date: str) -> Dict:
     # Calculate profit margin
     profit_margin = (profit_30_days / revenue_30_days * 100) if revenue_30_days > 0 else 0
 
-    return {
-        "as_of_date": as_of_date,
-        "cash_balance": cash_balance,
-        "inventory_value": inventory_value,
-        "total_assets": total_assets,
-        "revenue_30_days": revenue_30_days,
-        "expenses_30_days": expenses_30_days,
-        "profit_30_days": profit_30_days,
-        "profit_margin": profit_margin,
-        "top_selling_products": top_selling_products,
-        "recent_transactions": recent_transactions,
-        "inventory_summary": financial_report["inventory_summary"]
-    }
+    return FinancialStatus(
+        as_of_date=as_of_date,
+        cash_balance=cash_balance,
+        inventory_value=inventory_value,
+        total_assets=total_assets,
+        revenue_30_days=revenue_30_days,
+        expenses_30_days=expenses_30_days,
+        profit_30_days=profit_30_days,
+        profit_margin=profit_margin,
+        top_selling_products=top_selling_products,
+        recent_transactions=recent_transactions,
+        inventory_summary=financial_report["inventory_summary"]
+    )
 
 # tool for orchestrator agent
 @tool
-def parse_request(request: str) -> Dict:
+def parse_request(request: str) -> RequestInfo:
     """
     Parse a customer request to extract key information.
 
@@ -1210,7 +1371,7 @@ def parse_request(request: str) -> Dict:
         request (str): The customer request text
 
     Returns:
-        Dict: Extracted information from the request
+        RequestInfo: A Pydantic model containing extracted information from the request
     """
     # Extract date from request if present
     import re
@@ -1244,12 +1405,12 @@ def parse_request(request: str) -> Dict:
         except:
             delivery_date = None
 
-    return {
-        "request_text": request,
-        "request_date": request_date,
-        "requested_items": requested_items,
-        "requested_delivery_date": delivery_date
-    }
+    return RequestInfo(
+        request_text=request,
+        request_date=request_date,
+        requested_items=requested_items,
+        requested_delivery_date=delivery_date
+    )
 
 # Set up your agents and create an orchestration agent that will manage them.
 # Define the agents using the smolagents framework
@@ -1269,12 +1430,10 @@ inventory_agent = ToolCallingAgent(model=model,
                          """)
 
 quote_agent = ToolCallingAgent(model=model,
-                         tools=[generate_quote,
-                                calculate_bulk_discount,
-                                search_quote_history],
+                         tools=[search_quote_history, calculate_bulk_discount],
                          name="QuoteAgent",
                          description="""
-                         The agent for generating quotes. It has access to tools such as `generate_quote`, `calculate_bulk_discount`, `search_quote_history`.
+                         The agent for generating quotes. It has access to tools `search_quote_history` to find past quotes. Apply bulk discount where there was similar preceding quote history to be fair.
                          """)
 order_agent = ToolCallingAgent(model=model,
                          tools=[process_order, check_order_status, get_supplier_delivery_date],
@@ -1283,13 +1442,17 @@ order_agent = ToolCallingAgent(model=model,
                          The agent for processing orders. It has access to tools such as `process_order`, `check_order_status`, `get_supplier_delivery_date`.
                          """)
 financial_agent = ToolCallingAgent(model=model,
-                         tools=[get_financial_status, get_cash_balance, generate_financial_report],
+                         tools=[get_financial_status, get_cash_balance],
                          name="FinancialAgent",
                          description="""
-                         The agent for generating financial reports. It has access to tools such as `get_financial_status`, `get_cash_balance`, `generate_financial_report`.
+                         The agent for generating financial reports. It has access to tools such as `get_financial_status`, `get_cash_balance`.
                          """)
-orchestrator = CodeAgent(model=model,
+orchestrator = ToolCallingAgent(model=model,
                          tools=[parse_request],
+                         instructions="You are a helpful agent. You will get quote request from client. "
+                                      "You have to check inventory status, check previous quote history "
+                                      "to find appropriate discount, generate quote, process order, "
+                                      "There are other agents that can help you.",
                          managed_agents=[inventory_agent, quote_agent, order_agent, financial_agent])
 
 
@@ -1346,7 +1509,7 @@ def run_test_scenarios():
         request_with_date = f"{row['request']} (Date of request: {request_date})"
 
         # Use our orchestrator agent to handle the request
-        response = orchestrator.run(request_with_date)
+        response = orchestrator.run(request_with_date, max_steps=5, reset=True)
 
         # Update state
         report = generate_financial_report(request_date)
