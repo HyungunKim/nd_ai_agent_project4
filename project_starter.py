@@ -296,15 +296,28 @@ def init_database(db_engine: Engine = db_engine, seed: int = 137) -> Engine:
         # ----------------------------
         # 1. Create an empty 'transactions' table schema
         # ----------------------------
-        transactions_schema = pd.DataFrame({
-            "id": [],
-            "item_name": [],
-            "transaction_type": [],  # 'stock_orders' or 'sales'
-            "units": [],             # Quantity involved
-            "price": [],             # Total price for the transaction
-            "transaction_date": [],  # ISO-formatted date
-        })
-        transactions_schema.to_sql("transactions", db_engine, if_exists="replace", index=False)
+        with db_engine.connect() as conn:
+            conn.execute(text("DROP TABLE transactions"))
+            conn.execute(text("""
+                              CREATE TABLE IF NOT EXISTS transactions
+                              (
+                                  id
+                                  INTEGER
+                                  PRIMARY
+                                  KEY
+                                  AUTOINCREMENT,
+                                  item_name
+                                  TEXT,
+                                  transaction_type
+                                  TEXT,
+                                  units
+                                  INTEGER,
+                                  price
+                                  REAL,
+                                  transaction_date
+                                  TEXT
+                              )
+                              """))
 
         # Set a consistent starting date
         initial_date = datetime(2025, 1, 1).isoformat()
@@ -1195,10 +1208,6 @@ def process_order(items: List[Union[Dict, OrderItem]], order_date: str) -> Order
                 delivery_date=None,
                 transaction_id=None
             ))
-    try:
-        ...
-    except Exception as e:
-        ...
     return Order(
         order_date=order_date,
         total_sales_amount=total_sales_amount,
